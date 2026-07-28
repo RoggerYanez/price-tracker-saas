@@ -1,6 +1,9 @@
 import os
 import csv
 import io
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime
 import psycopg2
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -197,14 +200,42 @@ def listar_productos(username: str = Query(...), rol: str = Query(...)):
 def agregar_producto(item: NuevoProducto):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
+    
+    # 1. Guardar el producto configurado en la base de datos
     cursor.execute(
         "INSERT INTO productos_configurados (username, nombre, url, categoria, precio_objetivo, estado) VALUES (%s, %s, %s, %s, %s, 'activo')",
         (item.username, item.nombre, item.url, item.categoria, item.precio_objetivo)
     )
     conexion.commit()
+
+    # 2. Ejecutar Web Scraping automático para obtener el precio inicial
+    precio_encontrado = 0.0
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(item.url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Selector por defecto compatible con books.toscrape.com
+            elemento_precio = soup.select_one(".price_color")
+            
+            if elemento_precio:
+                texto_precio = elemento_precio.text.replace("£", "").replace("$", "").strip()
+                precio_encontrado = float(texto_precio)
+    except Exception as e:
+        print(f"Error al realizar el scraping inicial: {e}")
+
+    # 3. Guardar el precio obtenido en el historial de precios
+    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute(
+        "INSERT INTO historial_precios (producto, precio, fecha) VALUES (%s, %s, %s)",
+        (item.nombre, precio_encontrado, fecha_actual)
+    )
+    conexion.commit()
+
     cursor.close()
     conexion.close()
-    return {"mensaje": "Producto registrado exitosamente"}
+    return {"mensaje": "Producto registrado y rastreado exitosamente"}
 
 @app.patch("/api/productos/{producto_id}/estado")
 def cambiar_estado_producto(producto_id: int, data: EstadoProducto):
