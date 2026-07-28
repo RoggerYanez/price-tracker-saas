@@ -1,17 +1,25 @@
 import sqlite3
 
 def inicializar_bd():
-    # Conecta (o crea) la base de datos local
     conexion = sqlite3.connect("monitoreo.db")
     cursor = conexion.cursor()
-
-    # Crea una tabla para almacenar los registros de precios
+    
+    # Tabla para guardar el historial de precios extraídos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS historial_precios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             producto TEXT,
             precio REAL,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            fecha TEXT
+        )
+    """)
+    
+    # Tabla para guardar los productos y URLs dinámicas de los clientes
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS productos_configurados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT,
+            url TEXT
         )
     """)
     
