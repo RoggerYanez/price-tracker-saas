@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+from apscheduler.schedulers.background import BackgroundScheduler
 
 def inicializar_bd():
     database_url = os.getenv("DATABASE_URL")
@@ -62,17 +63,77 @@ def inicializar_bd():
     conexion.commit()
     cursor.close()
     conexion.close()
-    print("Base de datos PostgreSQL inicializada con éxito para Fase 2.")
+    print("Base de datos PostgreSQL inicializada con éxito.")
+
+# ==========================================
+# CONFIGURACIÓN DEL PLANIFICADOR AUTOMÁTICO
+# ==========================================
+scheduler = BackgroundScheduler()
+
+def tarea_scraping_automatico():
+    """Tarea periódica que recorre todos los productos activos y actualiza su precio."""
+    print("Iniciando tarea automática de rastreo de precios en segundo plano...")
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            return
+        
+        conexion = psycopg2.connect(database_url)
+        cursor = conexion.cursor()
+        
+        # Solo seleccionamos productos cuyo estado sea 'activo' (respeta la opción de pausar)
+        cursor.execute("SELECT id, nombre, url FROM productos_configurados WHERE estado = 'activo'")
+        productos = cursor.fetchall()
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        
+        for prod in productos:
+            prod_id, nombre, url = prod
+            precio_encontrado = 0.0
+            try:
+                response = requests.get(url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    elemento_precio = soup.select_one(".price_color")
+                    if elemento_precio:
+                        match = re.search(r"[\d\.]+", elemento_precio.text)
+                        if match:
+                            precio_encontrado = float(match.group())
+            except Exception as e:
+                print(f"Error haciendo scraping automático para {nombre}: {e}")
+            
+            # Guardamos el nuevo registro en el historial para alimentar el gráfico progresivo
+            fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute(
+                "INSERT INTO historial_precios (producto, precio, fecha) VALUES (%s, %s, %s)",
+                (nombre, precio_encontrado, fecha_actual)
+            )
+            
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+        print("Tarea automática de precios finalizada con éxito.")
+    except Exception as e:
+        print(f"Error crítico en APScheduler: {e}")
+
+# Configuramos el intervalo: por ejemplo, cada 2 minutos para pruebas (puedes cambiarlo a hours=1)
+scheduler.add_job(tarea_scraping_automatico, 'interval', minutes=2)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         inicializar_bd()
+        scheduler.start()
+        print("APScheduler iniciado correctamente.")
     except Exception as e:
-        print(f"Error crítico al inicializar la base de datos: {e}")
+        print(f"Error crítico al iniciar servicios: {e}")
     yield
+    scheduler.shutdown()
+    print("APScheduler detenido.")
 
-app = FastAPI(title="SaaS Monitoreo de Precios - Fase 2", lifespan=lifespan)
+app = FastAPI(title="SaaS Monitoreo de Precios - Automatizado", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
 def obtener_conexion():
@@ -202,46 +263,28 @@ def agregar_producto(item: NuevoProducto):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     
-    # 1. Guardar el producto configurado en la base de datos
     cursor.execute(
         "INSERT INTO productos_configurados (username, nombre, url, categoria, precio_objetivo, estado) VALUES (%s, %s, %s, %s, %s, 'activo')",
         (item.username, item.nombre, item.url, item.categoria, item.precio_objetivo)
     )
     conexion.commit()
 
-    # 2. Ejecutar Web Scraping robusto
     precio_encontrado = 0.0
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        print(f"Realizando scraping a la URL: {item.url}")
         response = requests.get(item.url, headers=headers, timeout=10)
-        print(f"Código de estado HTTP recibido: {response.status_code}")
-        
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Buscamos específicamente el elemento de precio en books.toscrape.com
             elemento_precio = soup.select_one(".price_color")
-            
             if elemento_precio:
-                texto_sucio = elemento_precio.text
-                print(f"Texto de precio localizado: {texto_sucio}")
-                # Extraer solo los números y el punto decimal usando expresiones regulares
-                match = re.search(r"[\d\.]+", texto_sucio)
+                match = re.search(r"[\d\.]+", elemento_precio.text)
                 if match:
                     precio_encontrado = float(match.group())
-            else:
-                print("No se encontró el selector .price_color en el HTML.")
-        else:
-            print(f"Fallo al cargar la página. Código HTTP: {response.status_code}")
     except Exception as e:
-        print(f"Excepción atrapada durante el scraping: {e}")
+        print(f"Error en scraping inicial: {e}")
 
-    print(f"Precio final guardado para {item.nombre}: {precio_encontrado}")
-
-    # 3. Guardar el precio obtenido en el historial de precios
     fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
         "INSERT INTO historial_precios (producto, precio, fecha) VALUES (%s, %s, %s)",
@@ -295,7 +338,7 @@ def obtener_historial_producto(nombre_producto: str):
     return [{"precio": f[0], "fecha": f[1]} for f in filas]
 
 # ==========================================
-# ENDPOINTS DE ADMINISTRACIÓN (Con múltiples alias)
+# ENDPOINTS DE ADMINISTRACIÓN
 # ==========================================
 
 def logica_admin_data():
@@ -401,6 +444,7 @@ def exportar_csv(username: str = Query(...), rol: str = Query(...)):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Producto", "Precio", "Fecha"])
+    for fila is filas: # (note: fixed standard python list loop below)
     for fila in filas:
         writer.writerow(fila)
     
