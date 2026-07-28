@@ -1,6 +1,7 @@
 import os
 import csv
 import io
+import re
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -208,22 +209,37 @@ def agregar_producto(item: NuevoProducto):
     )
     conexion.commit()
 
-    # 2. Ejecutar Web Scraping automático para obtener el precio inicial
+    # 2. Ejecutar Web Scraping robusto
     precio_encontrado = 0.0
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        print(f"Realizando scraping a la URL: {item.url}")
         response = requests.get(item.url, headers=headers, timeout=10)
+        print(f"Código de estado HTTP recibido: {response.status_code}")
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            # Selector por defecto compatible con books.toscrape.com
+            
+            # Buscamos específicamente el elemento de precio en books.toscrape.com
             elemento_precio = soup.select_one(".price_color")
             
             if elemento_precio:
-                texto_precio = elemento_precio.text.replace("£", "").replace("$", "").strip()
-                precio_encontrado = float(texto_precio)
+                texto_sucio = elemento_precio.text
+                print(f"Texto de precio localizado: {texto_sucio}")
+                # Extraer solo los números y el punto decimal usando expresiones regulares
+                match = re.search(r"[\d\.]+", texto_sucio)
+                if match:
+                    precio_encontrado = float(match.group())
+            else:
+                print("No se encontró el selector .price_color en el HTML.")
+        else:
+            print(f"Fallo al cargar la página. Código HTTP: {response.status_code}")
     except Exception as e:
-        print(f"Error al realizar el scraping inicial: {e}")
+        print(f"Excepción atrapada durante el scraping: {e}")
+
+    print(f"Precio final guardado para {item.nombre}: {precio_encontrado}")
 
     # 3. Guardar el precio obtenido en el historial de precios
     fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
