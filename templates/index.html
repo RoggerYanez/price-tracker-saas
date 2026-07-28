@@ -116,7 +116,7 @@
             </div>
         </div>
 
-        <!-- Gráfico -->
+        <!-- Gráfico Completo con Línea de Precio Objetivo -->
         <div id="chart-section" class="bg-gray-800 p-6 rounded-xl border border-gray-700 hidden shadow">
             <div class="flex justify-between items-center mb-4">
                 <h2 id="chart-title" class="text-lg font-semibold text-indigo-300">Historial de Precios</h2>
@@ -308,7 +308,7 @@
                         <td class="p-3 text-gray-400 text-xs">${p.fecha}</td>
                         <td class="p-3"><span class="px-2 py-1 rounded text-xs ${p.estado === 'activo' ? 'bg-emerald-900 text-emerald-300' : 'bg-amber-900 text-amber-300'}">${p.estado}</span></td>
                         <td class="p-3 space-x-2">
-                            <button onclick="verHistorial('${p.producto}')" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded text-xs text-white">Gráfico</button>
+                            <button onclick="verHistorial('${p.producto}', ${p.precio_objetivo})" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded text-xs text-white">Gráfico</button>
                             <button onclick="cambiarEstado(${p.id}, '${p.estado}')" class="bg-amber-600 hover:bg-amber-500 px-2.5 py-1 rounded text-xs text-white">${p.estado === 'activo' ? 'Pausar' : 'Activar'}</button>
                             <button onclick="eliminarProducto(${p.id})" class="bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded text-xs text-white">Eliminar</button>
                         </td>
@@ -320,7 +320,7 @@
             }
         }
 
-        // Configurar actualización automática cada 10 segundos (10000 milisegundos)
+        // Configurar actualización automática cada 10 segundos
         setInterval(() => {
             if (typeof cargarProductosCliente === 'function' && currentUser && currentRole !== 'admin') {
                 cargarProductosCliente();
@@ -368,7 +368,7 @@
             cargarProductosCliente();
         }
 
-        async function verHistorial(nombreProducto) {
+        async function verHistorial(nombreProducto, precioObjetivo = 0) {
             try {
                 const res = await fetch(`/api/historial/${encodeURIComponent(nombreProducto)}`);
                 const historial = await res.json();
@@ -378,6 +378,8 @@
 
                 const labels = historial.map(h => h.fecha);
                 const precios = historial.map(h => h.precio);
+                // Línea de referencia constante para el precio objetivo en cada punto del historial
+                const objetivos = labels.map(() => precioObjetivo);
 
                 const ctx = document.getElementById('priceChart').getContext('2d');
                 if (myChart) myChart.destroy();
@@ -386,15 +388,26 @@
                     type: 'line',
                     data: {
                         labels: labels,
-                        datasets: [{
-                            label: 'Precio ($)',
-                            data: precios,
-                            borderColor: '#818cf8',
-                            backgroundColor: 'rgba(129, 140, 248, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.1
-                        }]
+                        datasets: [
+                            {
+                                label: 'Precio Actual ($)',
+                                data: precios,
+                                borderColor: '#818cf8',
+                                backgroundColor: 'rgba(129, 140, 248, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Precio Objetivo ($)',
+                                data: objetivos,
+                                borderColor: '#fbbf24',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                pointRadius: 0,
+                                fill: false
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
