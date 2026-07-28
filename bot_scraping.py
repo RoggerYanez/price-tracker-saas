@@ -12,14 +12,14 @@ def ejecutar_scraping():
     conexion = psycopg2.connect(database_url)
     cursor = conexion.cursor()
     
-    # Consultar todas las URLs configuradas por los clientes
-    cursor.execute("SELECT nombre, url FROM productos_configurados")
+    # Solo rastrear productos activos
+    cursor.execute("SELECT nombre, url FROM productos_configurados WHERE estado = 'activo'")
     productos = cursor.fetchall()
     cursor.close()
     conexion.close()
 
     if not productos:
-        print("No hay productos configurados para rastrear en la base de datos.")
+        print("No hay productos activos para rastrear en la base de datos.")
         return
 
     with sync_playwright() as p:
@@ -33,11 +33,8 @@ def ejecutar_scraping():
                 
                 # Selector de ejemplo (ajustar según la página web)
                 precio_texto = page.locator(".price_color").inner_text()
-                
-                # Limpiar el texto del precio para convertirlo a número decimal
                 precio_limpio = float(precio_texto.replace("S/", "").replace("£", "").replace("$", "").strip())
                 
-                # Guardar el nuevo precio obtenido en PostgreSQL
                 conexion = psycopg2.connect(database_url)
                 cursor = conexion.cursor()
                 fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
