@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PriceTracker PRO - Fase 2</title>
+    <title>PriceTracker PRO - Panel</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js para Gráficos -->
@@ -41,12 +41,14 @@
         </div>
     </div>
 
-    <!-- Panel de Control Principal (Dashboard) -->
-    <div id="dashboard-container" class="hidden container mx-auto px-4 py-8">
+    <!-- ========================================== -->
+    <!-- PANEL DE CLIENTE (DASHBOARD CLIENTE)       -->
+    <!-- ========================================== -->
+    <div id="client-dashboard" class="hidden container mx-auto px-4 py-8">
         <header class="flex justify-between items-center mb-8 bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
             <div>
                 <h1 class="text-2xl font-bold text-indigo-400">PriceTracker Dashboard</h1>
-                <p class="text-sm text-gray-400 mt-1">Bienvenido, <span id="user-display" class="font-semibold text-white"></span></p>
+                <p class="text-sm text-gray-400 mt-1">Bienvenido, <span id="client-user-display" class="font-semibold text-white"></span></p>
             </div>
             <div class="space-x-2">
                 <button onclick="exportarCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow">Exportar CSV</button>
@@ -54,38 +56,32 @@
             </div>
         </header>
 
-        <!-- Panel Dinámico: Tarjetas de Resumen -->
+        <!-- Tarjetas de Resumen Cliente -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-400">Total Productos</p>
-                    <h3 id="stat-total" class="text-2xl font-bold text-white mt-1">0</h3>
+                    <h3 id="client-stat-total" class="text-2xl font-bold text-white mt-1">0</h3>
                 </div>
-                <div class="p-3 bg-indigo-600/20 text-indigo-400 rounded-lg">
-                    📦
-                </div>
+                <div class="p-3 bg-indigo-600/20 text-indigo-400 rounded-lg">📦</div>
             </div>
             <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-400">Productos Activos</p>
-                    <h3 id="stat-activos" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
+                    <h3 id="client-stat-activos" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
                 </div>
-                <div class="p-3 bg-emerald-600/20 text-emerald-400 rounded-lg">
-                    ⚡
-                </div>
+                <div class="p-3 bg-emerald-600/20 text-emerald-400 rounded-lg">⚡</div>
             </div>
             <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-400">Alertas Objetivo</p>
-                    <h3 id="stat-alertas" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
+                    <h3 id="client-stat-alertas" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
                 </div>
-                <div class="p-3 bg-amber-600/20 text-amber-400 rounded-lg">
-                    🔔
-                </div>
+                <div class="p-3 bg-amber-600/20 text-amber-400 rounded-lg">🔔</div>
             </div>
         </div>
 
-        <!-- Formulario para Agregar Producto -->
+        <!-- Formulario Producto -->
         <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 mb-8 shadow">
             <h2 class="text-lg font-semibold mb-4 text-indigo-300">Configurar Nuevo Producto a Rastrear</h2>
             <form onsubmit="agregarProducto(event)" class="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -97,10 +93,10 @@
             </form>
         </div>
 
-        <!-- Tabla de Productos Rastreados -->
+        <!-- Tabla Productos -->
         <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden mb-8 shadow">
             <div class="p-4 border-b border-gray-700 bg-gray-800/50">
-                <h2 class="text-lg font-semibold text-indigo-300">Productos Monitoreados</h2>
+                <h2 class="text-lg font-semibold text-indigo-300">Mis Productos Monitoreados</h2>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -115,14 +111,12 @@
                             <th class="p-3">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="productos-tabla" class="divide-y divide-gray-700 text-sm">
-                        <!-- Inyectado por JS -->
-                    </tbody>
+                    <tbody id="productos-tabla" class="divide-y divide-gray-700 text-sm"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Modal / Contenedor de Gráfico de Historial -->
+        <!-- Gráfico -->
         <div id="chart-section" class="bg-gray-800 p-6 rounded-xl border border-gray-700 hidden shadow">
             <div class="flex justify-between items-center mb-4">
                 <h2 id="chart-title" class="text-lg font-semibold text-indigo-300">Historial de Precios</h2>
@@ -134,11 +128,99 @@
         </div>
     </div>
 
+    <!-- ========================================== -->
+    <!-- PANEL DE ADMINISTRADOR (ADMIN DASHBOARD)   -->
+    <!-- ========================================== -->
+    <div id="admin-dashboard" class="hidden container mx-auto px-4 py-8">
+        <header class="flex justify-between items-center mb-8 bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
+            <div>
+                <h1 class="text-2xl font-bold text-emerald-400">Panel de Administración - SaaS</h1>
+                <p class="text-sm text-gray-400 mt-1">Bienvenido, <span id="admin-user-display" class="font-semibold text-white"></span></p>
+            </div>
+            <div class="space-x-2">
+                <button onclick="logout()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <!-- Tarjetas de Ganancias y Estadísticas de Negocio -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Ganancias Totales (MRR)</p>
+                    <h3 id="admin-stat-ganancias" class="text-2xl font-bold text-emerald-400 mt-1">$0.00</h3>
+                </div>
+                <div class="p-3 bg-emerald-600/20 text-emerald-400 rounded-lg">💰</div>
+            </div>
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Total Clientes</p>
+                    <h3 id="admin-stat-clientes" class="text-2xl font-bold text-indigo-400 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-indigo-600/20 text-indigo-400 rounded-lg">👥</div>
+            </div>
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Productos Monitoreados</p>
+                    <h3 id="admin-stat-productos" class="text-2xl font-bold text-blue-400 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-blue-600/20 text-blue-400 rounded-lg">📊</div>
+            </div>
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Alertas Activas</p>
+                    <h3 id="admin-stat-alertas" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-amber-600/20 text-amber-400 rounded-lg">⚡</div>
+            </div>
+        </div>
+
+        <!-- Sección de Gráficos de Estadísticas de Negocio -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow">
+                <h2 class="text-lg font-semibold text-emerald-300 mb-4">Crecimiento de Ganancias ($)</h2>
+                <div class="relative h-64">
+                    <canvas id="adminRevenueChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow">
+                <h2 class="text-lg font-semibold text-indigo-300 mb-4">Productos por Categoría</h2>
+                <div class="relative h-64">
+                    <canvas id="adminCategoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Clientes Registrados -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow mb-8">
+            <div class="p-4 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-emerald-300">Lista de Clientes Registrados</h2>
+                <button onclick="cargarAdminData()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs">Actualizar Lista</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-700/50 text-gray-300 text-sm">
+                            <th class="p-3">ID</th>
+                            <th class="p-3">Nombre de Usuario</th>
+                            <th class="p-3">Correo Electrónico</th>
+                            <th class="p-3">Rol</th>
+                            <th class="p-3">Productos Registrados</th>
+                            <th class="p-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-clientes-tabla" class="divide-y divide-gray-700 text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script>
         let isRegisterMode = false;
         let currentUser = null;
         let currentRole = null;
         let myChart = null;
+        let adminRevChart = null;
+        let adminCatChart = null;
 
         function toggleAuthMode() {
             isRegisterMode = !isRegisterMode;
@@ -175,10 +257,17 @@
                 } else {
                     currentUser = data.username;
                     currentRole = data.rol;
-                    document.getElementById('user-display').innerText = currentUser;
                     document.getElementById('auth-container').classList.add('hidden');
-                    document.getElementById('dashboard-container').classList.remove('hidden');
-                    cargarProductos();
+
+                    if (currentRole === 'admin') {
+                        document.getElementById('admin-user-display').innerText = currentUser;
+                        document.getElementById('admin-dashboard').classList.remove('hidden');
+                        cargarAdminData();
+                    } else {
+                        document.getElementById('client-user-display').innerText = currentUser;
+                        document.getElementById('client-dashboard').classList.remove('hidden');
+                        cargarProductosCliente();
+                    }
                 }
             } catch (err) {
                 errorDiv.innerText = err.message;
@@ -186,21 +275,21 @@
             }
         }
 
-        async function cargarProductos() {
+        // --- Funciones de Cliente ---
+        async function cargarProductosCliente() {
             try {
                 const res = await fetch(`/api/productos?username=${encodeURIComponent(currentUser)}&rol=${encodeURIComponent(currentRole)}`);
                 const productos = await res.json();
                 const tbody = document.getElementById('productos-tabla');
                 tbody.innerHTML = '';
 
-                // Actualizar métricas del panel dinámico
                 let total = productos.length;
                 let activos = productos.filter(p => p.estado === 'activo').length;
                 let alertas = productos.filter(p => p.precio > 0 && p.precio_objetivo > 0 && p.precio <= p.precio_objetivo).length;
 
-                document.getElementById('stat-total').innerText = total;
-                document.getElementById('stat-activos').innerText = activos;
-                document.getElementById('stat-alertas').innerText = alertas;
+                document.getElementById('client-stat-total').innerText = total;
+                document.getElementById('client-stat-activos').innerText = activos;
+                document.getElementById('client-stat-alertas').innerText = alertas;
 
                 if (total === 0) {
                     tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">No hay productos registrados.</td></tr>`;
@@ -249,7 +338,7 @@
                 document.getElementById('prod-url').value = '';
                 document.getElementById('prod-categoria').value = '';
                 document.getElementById('prod-objetivo').value = '';
-                cargarProductos();
+                cargarProductosCliente();
             } catch (err) {
                 alert(err.message);
             }
@@ -262,13 +351,13 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ estado: nuevoEstado })
             });
-            cargarProductos();
+            cargarProductosCliente();
         }
 
         async function eliminarProducto(id) {
-            if (!confirm('¿Estás seguro de eliminar este producto y su historial?')) return;
+            if (!confirm('¿Estás seguro de eliminar este producto?')) return;
             await fetch(`/api/productos/${id}`, { method: 'DELETE' });
-            cargarProductos();
+            cargarProductosCliente();
         }
 
         async function verHistorial(nombreProducto) {
@@ -309,7 +398,7 @@
                     }
                 });
             } catch (err) {
-                alert('Error al cargar el historial del gráfico');
+                alert('Error al cargar el gráfico');
             }
         }
 
@@ -322,10 +411,104 @@
             window.location.href = `/api/exportar-csv?username=${encodeURIComponent(currentUser)}&rol=${encodeURIComponent(currentRole)}`;
         }
 
+        // --- Funciones de Administrador ---
+        async function cargarAdminData() {
+            try {
+                const res = await fetch('/api/admin/data');
+                const data = await res.json();
+
+                // Actualizar tarjetas de negocio
+                document.getElementById('admin-stat-ganancias').innerText = `$${data.ganancias_totales.toFixed(2)}`;
+                document.getElementById('admin-stat-clientes').innerText = data.total_clientes;
+                document.getElementById('admin-stat-productos').innerText = data.total_productos;
+                document.getElementById('admin-stat-alertas').innerText = data.total_alertas;
+
+                // Llenar tabla de clientes
+                const tbody = document.getElementById('admin-clientes-tabla');
+                tbody.innerHTML = '';
+                if (data.clientes.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">No hay clientes registrados.</td></tr>`;
+                } else {
+                    data.clientes.forEach(c => {
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-gray-700/30 transition";
+                        tr.innerHTML = `
+                            <td class="p-3 text-gray-400">#${c.id}</td>
+                            <td class="p-3 font-medium text-white">${c.username}</td>
+                            <td class="p-3 text-gray-300">${c.email || 'N/A'}</td>
+                            <td class="p-3"><span class="bg-indigo-900 text-indigo-300 px-2 py-0.5 rounded text-xs">${c.rol}</span></td>
+                            <td class="p-3 text-emerald-400 font-semibold">${c.productos_count} productos</td>
+                            <td class="p-3">
+                                <button onclick="eliminarCliente(${c.id})" class="bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded text-xs text-white">Eliminar</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                // Renderizar Gráficos de Admin
+                renderAdminCharts(data);
+
+            } catch (err) {
+                console.error("Error al cargar datos del admin:", err);
+            }
+        }
+
+        function renderAdminCharts(data) {
+            // Gráfico de Ganancias
+            const ctxRev = document.getElementById('adminRevenueChart').getContext('2d');
+            if (adminRevChart) adminRevChart.destroy();
+            adminRevChart = new Chart(ctxRev, {
+                type: 'bar',
+                data: {
+                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul'],
+                    datasets: [{
+                        label: 'Ganancias ($)',
+                        data: [150, 230, 410, 580, 790, 950, data.ganancias_totales || 1240],
+                        backgroundColor: '#34d399',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
+                        x: { grid: { color: '#374151' }, ticks: { color: '#9ca3af' } }
+                    }
+                }
+            });
+
+            // Gráfico de Categorías
+            const ctxCat = document.getElementById('adminCategoryChart').getContext('2d');
+            if (adminCatChart) adminCatChart.destroy();
+            adminCatChart = new Chart(ctxCat, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Tecnología', 'Hogar', 'Moda', 'Otros'],
+                    datasets: [{
+                        data: [12, 8, 5, 3],
+                        backgroundColor: ['#818cf8', '#34d399', '#ffb703', '#ef476f']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        async function eliminarCliente(id) {
+            if (!confirm('¿Estás seguro de eliminar este cliente y sus productos?')) return;
+            await fetch(`/api/admin/clientes/${id}`, { method: 'DELETE' });
+            cargarAdminData();
+        }
+
         function logout() {
             currentUser = null;
             currentRole = null;
-            document.getElementById('dashboard-container').classList.add('hidden');
+            document.getElementById('client-dashboard').classList.add('hidden');
+            document.getElementById('admin-dashboard').classList.add('hidden');
             document.getElementById('auth-container').classList.remove('hidden');
             document.getElementById('username').value = '';
             document.getElementById('password').value = '';
