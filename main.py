@@ -247,6 +247,86 @@ def obtener_historial_producto(nombre_producto: str):
     conexion.close()
     return [{"precio": f[0], "fecha": f[1]} for f in filas]
 
+# ==========================================
+# NUEVOS ENDPOINTS DE ADMINISTRACIÓN (SaaS)
+# ==========================================
+
+@app.get("/api/admin/data")
+def get_admin_data():
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+    
+    # Obtener usuarios que sean clientes (excluyendo administradores)
+    cursor.execute("SELECT id, username, email, rol FROM usuarios WHERE LOWER(rol) != 'admin'")
+    usuarios_db = cursor.fetchall()
+    
+    clientes = []
+    total_productos = 0
+    total_alertas = 0
+    
+    for u in usuarios_db:
+        # Contar productos y alertas del cliente actual
+        cursor.execute("""
+            SELECT COUNT(*), SUM(CASE WHEN hp.precio IS NOT NULL AND pc.precio_objetivo > 0 AND hp.precio <= pc.precio_objetivo THEN 1 ELSE 0 END) 
+            FROM productos_configurados pc
+            LEFT JOIN LATERAL (
+                SELECT precio FROM historial_precios WHERE producto = pc.nombre ORDER BY id DESC LIMIT 1
+            ) hp ON true
+            WHERE pc.username = %s
+        """, (u[1],))
+        res_prod = cursor.fetchone()
+        prod_count = res_prod[0] or 0
+        alertas_count = res_prod[1] or 0
+        
+        total_productos += prod_count
+        total_alertas += alertas_count
+        
+        clientes.append({
+            "id": u[0],
+            "username": u[1],
+            "email": u[2],
+            "rol": u[3],
+            "productos_count": prod_count
+        })
+    
+    # Ganancias estimadas basadas en el número de clientes (ej: $29.90 por cliente)
+    ganancias_totales = len(clientes) * 29.90
+    
+    cursor.close()
+    conexion.close()
+    
+    return {
+        "ganancias_totales": ganancias_totales,
+        "total_clientes": len(clientes),
+        "total_productos": total_productos,
+        "total_alertas": total_alertas,
+        "clientes": clientes
+    }
+
+@app.delete("/api/admin/clientes/{cliente_id}")
+def eliminar_cliente(cliente_id: int):
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+    
+    # Obtener el nombre de usuario para borrar también sus productos y su historial asociado
+    cursor.execute("SELECT username FROM usuarios WHERE id = %s", (cliente_id,))
+    user = cursor.fetchone()
+    if user:
+        username = user[0]
+        # Obtener los productos del usuario para borrar su historial de precios
+        cursor.execute("SELECT nombre FROM productos_configurados WHERE username = %s", (username,))
+        productos = cursor.fetchall()
+        for p in productos:
+            cursor.execute("DELETE FROM historial_precios WHERE producto = %s", (p[0],))
+            
+        cursor.execute("DELETE FROM productos_configurados WHERE username = %s", (username,))
+        cursor.execute("DELETE FROM usuarios WHERE id = %s", (cliente_id,))
+        conexion.commit()
+        
+    cursor.close()
+    conexion.close()
+    return {"message": "Cliente eliminado correctamente"}
+
 @app.get("/api/exportar-csv")
 def exportar_csv(username: str = Query(...), rol: str = Query(...)):
     conexion = obtener_conexion()
