@@ -221,6 +221,10 @@
         let myChart = null;
         let adminRevChart = null;
         let adminCatChart = null;
+        
+        // Variables para control de sondeo automático del gráfico activo
+        let currentChartProduct = null;
+        let currentChartObjective = 0;
 
         function toggleAuthMode() {
             isRegisterMode = !isRegisterMode;
@@ -320,11 +324,16 @@
             }
         }
 
-        // Configurar actualización automática cada 10 segundos
+        // Configurar actualización automática cada 10 segundos (incluyendo tabla, estadísticas y gráfico activo)
         setInterval(() => {
             if (typeof cargarProductosCliente === 'function' && currentUser && currentRole !== 'admin') {
                 cargarProductosCliente();
                 console.log("Tabla actualizada automáticamente en segundo plano.");
+                
+                // Actualizar el gráfico activo si hay uno abierto
+                if (currentChartProduct) {
+                    actualizarGraficoActual();
+                }
             }
         }, 10000);
 
@@ -368,18 +377,15 @@
             cargarProductosCliente();
         }
 
-        async function verHistorial(nombreProducto, precioObjetivo = 0) {
+        async function actualizarGraficoActual() {
+            if (!currentChartProduct) return;
             try {
-                const res = await fetch(`/api/historial/${encodeURIComponent(nombreProducto)}`);
+                const res = await fetch(`/api/historial/${encodeURIComponent(currentChartProduct)}`);
                 const historial = await res.json();
                 
-                document.getElementById('chart-title').innerText = `Evolución de Precio: ${nombreProducto}`;
-                document.getElementById('chart-section').classList.remove('hidden');
-
                 const labels = historial.map(h => h.fecha);
                 const precios = historial.map(h => h.precio);
-                // Línea de referencia constante para el precio objetivo en cada punto del historial
-                const objetivos = labels.map(() => precioObjetivo);
+                const objetivos = labels.map(() => currentChartObjective);
 
                 const ctx = document.getElementById('priceChart').getContext('2d');
                 if (myChart) myChart.destroy();
@@ -418,12 +424,22 @@
                         }
                     }
                 });
+                console.log("Gráfico actualizado automáticamente en segundo plano.");
             } catch (err) {
-                alert('Error al cargar el gráfico');
+                console.error("Error al actualizar el gráfico en segundo plano:", err);
             }
         }
 
+        async function verHistorial(nombreProducto, precioObjetivo = 0) {
+            currentChartProduct = nombreProducto;
+            currentChartObjective = precioObjetivo;
+            document.getElementById('chart-title').innerText = `Evolución de Precio: ${nombreProducto}`;
+            document.getElementById('chart-section').classList.remove('hidden');
+            await actualizarGraficoActual();
+        }
+
         function cerrarGrafico() {
+            currentChartProduct = null;
             document.getElementById('chart-section').classList.add('hidden');
             if (myChart) myChart.destroy();
         }
@@ -528,6 +544,7 @@
         function logout() {
             currentUser = null;
             currentRole = null;
+            currentChartProduct = null;
             document.getElementById('client-dashboard').classList.add('hidden');
             document.getElementById('admin-dashboard').classList.add('hidden');
             document.getElementById('auth-container').classList.remove('hidden');
