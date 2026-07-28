@@ -4,8 +4,67 @@ from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="SaaS Monitoreo de Precios")
+def inicializar_bd():
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("La variable de entorno DATABASE_URL no está configurada.")
+
+    conexion = psycopg2.connect(database_url)
+    cursor = conexion.cursor()
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historial_precios (
+            id SERIAL PRIMARY KEY,
+            producto TEXT,
+            precio REAL,
+            fecha TEXT
+        )
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS productos_configurados (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            nombre TEXT NOT NULL,
+            url TEXT NOT NULL
+        )
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            rol TEXT NOT NULL
+        )
+    """)
+    
+    cursor.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute(
+            "INSERT INTO usuarios (username, email, password, rol) VALUES (%s, %s, %s, %s)",
+            ('admin', 'admin@pricetracker.com', '12345', 'admin')
+        )
+        print("Administrador por defecto creado.")
+
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+    print("Base de datos PostgreSQL inicializada con éxito.")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Inicializa la base de datos al arrancar el servidor en Railway
+    try:
+        inicializar_bd()
+    except Exception as e:
+        print(f"Error crítico al inicializar la base de datos: {e}")
+    yield
+
+app = FastAPI(title="SaaS Monitoreo de Precios", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
 def obtener_conexion():
