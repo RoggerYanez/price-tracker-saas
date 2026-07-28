@@ -81,7 +81,6 @@ def tarea_scraping_automatico():
         conexion = psycopg2.connect(database_url)
         cursor = conexion.cursor()
         
-        # Solo seleccionamos productos cuyo estado sea 'activo' (respeta la opción de pausar)
         cursor.execute("SELECT id, nombre, url FROM productos_configurados WHERE estado = 'activo'")
         productos = cursor.fetchall()
         
@@ -104,7 +103,6 @@ def tarea_scraping_automatico():
             except Exception as e:
                 print(f"Error haciendo scraping automático para {nombre}: {e}")
             
-            # Guardamos el nuevo registro en el historial para alimentar el gráfico progresivo
             fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute(
                 "INSERT INTO historial_precios (producto, precio, fecha) VALUES (%s, %s, %s)",
@@ -118,7 +116,6 @@ def tarea_scraping_automatico():
     except Exception as e:
         print(f"Error crítico en APScheduler: {e}")
 
-# Configuramos el intervalo: por ejemplo, cada 2 minutos para pruebas (puedes cambiarlo a hours=1)
 scheduler.add_job(tarea_scraping_automatico, 'interval', minutes=2)
 
 @asynccontextmanager
@@ -444,7 +441,6 @@ def exportar_csv(username: str = Query(...), rol: str = Query(...)):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Producto", "Precio", "Fecha"])
-    for fila is filas: # (note: fixed standard python list loop below)
     for fila in filas:
         writer.writerow(fila)
     
