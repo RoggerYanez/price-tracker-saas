@@ -13,11 +13,13 @@ def inicializar_bd():
         )
     """)
     
+    # Tabla productos_configurados con la columna 'username'
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS productos_configurados (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT,
-            url TEXT
+            username TEXT NOT NULL,
+            nombre TEXT NOT NULL,
+            url TEXT NOT NULL
         )
     """)
     
@@ -25,21 +27,21 @@ def inicializar_bd():
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             rol TEXT NOT NULL
         )
     """)
     
-    # Crear admin por defecto si no existe
     cursor.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO usuarios (username, password, rol) VALUES (?, ?, ?)", 
-                       ('admin', '12345', 'admin'))
-        print("Administrador por defecto creado: admin / 12345")
+        cursor.execute("INSERT INTO usuarios (username, email, password, rol) VALUES (?, ?, ?, ?)", 
+                       ('admin', 'admin@pricetracker.com', '12345', 'admin'))
+        print("Administrador por defecto creado.")
 
     conexion.commit()
     conexion.close()
-    print("Base de datos actualizada correctamente.")
+    print("Base de datos actualizada con productos por usuario.")
 
 if __name__ == "__main__":
     inicializar_bd()

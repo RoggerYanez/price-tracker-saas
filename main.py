@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ def obtener_conexion():
     return sqlite3.connect("monitoreo.db")
 
 class NuevoProducto(BaseModel):
+    username: str
     nombre: str
     url: str
 
@@ -20,6 +21,7 @@ class LoginData(BaseModel):
 
 class RegisterData(BaseModel):
     username: str
+    email: str
     password: str
 
 @app.get("/", response_class=HTMLResponse)
@@ -30,45 +32,68 @@ def home(request: Request):
 def login(data: LoginData):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
-    cursor.execute("SELECT rol FROM usuarios WHERE username = ? AND password = ?", (data.username, data.password))
+    cursor.execute("SELECT rol, username FROM usuarios WHERE LOWER(username) = LOWER(?) AND password = ?", (data.username.strip(), data.password))
     usuario = cursor.fetchone()
     conexion.close()
     
     if not usuario:
         raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
     
-    return {"mensaje": "Login exitoso", "rol": usuario[0], "username": data.username}
+    return {"mensaje": "Login exitoso", "rol": usuario[0], "username": usuario[1]}
 
-# NUEVO: Endpoint para registrarse como cliente nuevo
 @app.post("/api/register")
 def register(data: RegisterData):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
+    user_limpio = data.username.strip()
+    email_limpio = data.email.strip().lower()
+    
     try:
-        # Por seguridad, el rol se define siempre como 'cliente' por defecto
-        cursor.execute("INSERT INTO usuarios (username, password, rol) VALUES (?, ?, ?)", 
-                       (data.username, data.password, 'cliente'))
+        cursor.execute("SELECT COUNT(*) FROM usuarios WHERE LOWER(username) = LOWER(?) OR LOWER(email) = ?", (user_limpio, email_limpio))
+        if cursor.fetchone()[0] > 0:
+            conexion.close()
+            raise HTTPException(status_code=400, detail="El nombre de usuario o el correo ya están registrados")
+
+        cursor.execute("INSERT INTO usuarios (username, email, password, rol) VALUES (?, ?, ?, ?)", 
+                       (user_limpio, email_limpio, data.password, 'cliente'))
         conexion.commit()
     except sqlite3.IntegrityError:
         conexion.close()
-        raise HTTPException(status_code=400, detail="El nombre de usuario ya está en uso")
+        raise HTTPException(status_code=400, detail="Error al registrar los datos")
     
     conexion.close()
     return {"mensaje": "Registro exitoso"}
 
 @app.get("/api/productos")
-def listar_productos():
+def listar_productos(username: str = Query(...), rol: str = Query(...)):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
-    cursor.execute("""
-        SELECT hp.id, hp.producto, hp.precio, hp.fecha 
-        FROM historial_precios hp
-        JOIN (
-            SELECT producto, MAX(id) as max_id 
-            FROM historial_precios 
-            GROUP BY producto
-        ) latest ON hp.id = latest.max_id
-    """)
+    
+    if rol == 'admin':
+        # El admin ve el historial general de todos los productos configurados
+        cursor.execute("""
+            SELECT hp.id, hp.producto, hp.precio, hp.fecha 
+            FROM historial_precios hp
+            JOIN (
+                SELECT producto, MAX(id) as max_id 
+                FROM historial_precios 
+                GROUP BY producto
+            ) latest ON hp.id = latest.max_id
+        """)
+    else:
+        # El cliente solo ve los precios de sus propios productos configurados
+        cursor.execute("""
+            SELECT hp.id, hp.producto, hp.precio, hp.fecha 
+            FROM historial_precios hp
+            JOIN productos_configurados pc ON hp.producto = pc.nombre
+            JOIN (
+                SELECT producto, MAX(id) as max_id 
+                FROM historial_precios 
+                GROUP BY producto
+            ) latest ON hp.id = latest.max_id AND hp.id = latest.max_id
+            WHERE pc.username = ?
+        """, (username,))
+        
     filas = cursor.fetchall()
     conexion.close()
     
@@ -78,7 +103,8 @@ def listar_productos():
 def agregar_producto(item: NuevoProducto):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
-    cursor.execute("INSERT INTO productos_configurados (nombre, url) VALUES (?, ?)", (item.nombre, item.url))
+    cursor.execute("INSERT INTO productos_configurados (username, nombre, url) VALUES (?, ?, ?)", 
+                   (item.username, item.nombre, item.url))
     conexion.commit()
     conexion.close()
     return {"mensaje": "Producto registrado exitosamente"}
