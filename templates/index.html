@@ -320,6 +320,14 @@
             }
         }
 
+        // Configurar actualización automática cada 10 segundos (10000 milisegundos)
+        setInterval(() => {
+            if (typeof cargarProductosCliente === 'function' && currentUser && currentRole !== 'admin') {
+                cargarProductosCliente();
+                console.log("Tabla actualizada automáticamente en segundo plano.");
+            }
+        }, 10000);
+
         async function agregarProducto(event) {
             event.preventDefault();
             const nombre = document.getElementById('prod-nombre').value;
