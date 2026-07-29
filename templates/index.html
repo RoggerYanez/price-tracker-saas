@@ -617,43 +617,71 @@
 
         // --- Funciones de Administrador ---
         async function cargarAdminData() {
-            try {
-                const res = await fetch('/api/admin/data');
-                const data = await res.json();
+    try {
+        const response = await fetch('/api/admin/data');
+        if (!response.ok) throw new Error("Error al cargar los datos del panel");
+        
+        const data = await response.json();
 
-                document.getElementById('admin-stat-ganancias').innerText = `$${data.ganancias_totales.toFixed(2)}`;
-                document.getElementById('admin-stat-clientes').innerText = data.total_clientes;
-                document.getElementById('admin-stat-productos').innerText = data.total_productos;
-                document.getElementById('admin-stat-alertas').innerText = data.total_alertas;
+        // 1. Actualizar las tarjetas de estadísticas superiores
+        document.getElementById('admin-stat-ganancias').innerText = `$${Number(data.ganancias_totales || data.ganancias || 0).toFixed(2)}`;
+        document.getElementById('admin-stat-clientes').innerText = data.total_clientes || data.total_usuarios || 0;
+        document.getElementById('admin-stat-productos').innerText = data.total_productos || 0;
+        document.getElementById('admin-stat-alertas').innerText = data.total_alertas || 0;
 
-                const tbody = document.getElementById('admin-clientes-tabla');
-                tbody.innerHTML = '';
-                if (data.clientes.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">No hay clientes registrados.</td></tr>`;
-                } else {
-                    data.clientes.forEach(c => {
-                        const tr = document.createElement('tr');
-                        tr.className = "hover:bg-gray-700/30 transition";
-                        tr.innerHTML = `
-                            <td class="p-3 text-gray-400">#${c.id}</td>
-                            <td class="p-3 font-medium text-white">${c.username}</td>
-                            <td class="p-3 text-gray-300">${c.email || 'N/A'}</td>
-                            <td class="p-3"><span class="bg-indigo-900 text-indigo-300 px-2 py-0.5 rounded text-xs">${c.rol}</span></td>
-                            <td class="p-3 text-emerald-400 font-semibold">${c.productos_count} productos</td>
-                            <td class="p-3">
-                                <button onclick="eliminarCliente(${c.id})" class="bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded text-xs text-white">Eliminar</button>
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                }
+        // 2. Renderizar la tabla de clientes con los botones de rol y eliminar
+        const tbody = document.getElementById('admin-clientes-tabla');
+        if (tbody) {
+            let filasHtml = '';
+            const listaClientes = data.clientes || data.usuarios || [];
+            
+            listaClientes.forEach(cliente => {
+                let botonRol = cliente.rol === 'pro' 
+                    ? `<button onclick="cambiarRolUsuario(${cliente.id}, 'cliente')" class="bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs font-semibold mr-2 transition">Quitar Pro</button>`
+                    : `<button onclick="cambiarRolUsuario(${cliente.id}, 'pro')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs font-semibold mr-2 transition">Hacer Pro</button>`;
 
-                renderAdminCharts(data);
-            } catch (err) {
-                console.error("Error al cargar datos del admin:", err);
-            }
+                filasHtml += `
+                    <tr>
+                        <td class="p-3">#${cliente.id}</td>
+                        <td class="p-3">${cliente.username}</td>
+                        <td class="p-3">${cliente.email}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-1 rounded text-xs ${cliente.rol === 'pro' ? 'bg-indigo-900 text-indigo-200 font-bold' : 'bg-gray-700 text-gray-300'}">${cliente.rol}</span>
+                        </td>
+                        <td class="p-3">${cliente.productos_registrados || cliente.productos_count || 0} productos</td>
+                        <td class="p-3">
+                            ${botonRol}
+                            <button onclick="eliminarCliente(${cliente.id})" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded text-xs font-semibold transition">Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = filasHtml;
         }
 
+        // Si manejas gráficos (Chart.js), se actualizan aquí si ya tienes tus funciones de gráficos creadas
+    } catch (error) {
+        console.error("Error:", error);
+    }
+}
+
+// Función para cambiar el rol comunicándose con el backend
+async function cambiarRolUsuario(usuarioId, nuevoRol) {
+    try {
+        const response = await fetch(`/api/admin/usuarios/${usuarioId}/rol`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rol: nuevoRol })
+        });
+
+        if (!response.ok) throw new Error("No se pudo actualizar el rol del usuario");
+
+        // Recarga los datos automáticamente para reflejar el cambio y actualizar ganancias
+        cargarAdminData();
+    } catch (error) {
+        alert(error.message);
+    }
+}
         function renderAdminCharts(data) {
             const ctxRev = document.getElementById('adminRevenueChart').getContext('2d');
             if (adminRevChart) adminRevChart.destroy();
