@@ -616,7 +616,10 @@
         }
 
         // --- Funciones de Administrador ---
-        async function cargarAdminData() {
+        let revenueChartInstance = null;
+let categoryChartInstance = null;
+
+async function cargarAdminData() {
     try {
         const response = await fetch('/api/admin/data');
         if (!response.ok) throw new Error("Error al cargar los datos del panel");
@@ -629,7 +632,7 @@
         document.getElementById('admin-stat-productos').innerText = data.total_productos || 0;
         document.getElementById('admin-stat-alertas').innerText = data.total_alertas || 0;
 
-        // 2. Renderizar la tabla de clientes con los botones de rol y eliminar
+        // 2. Renderizar la tabla de clientes con los botones de rol (Pro / Cliente) y eliminar
         const tbody = document.getElementById('admin-clientes-tabla');
         if (tbody) {
             let filasHtml = '';
@@ -659,12 +662,93 @@
             tbody.innerHTML = filasHtml;
         }
 
-        // Si manejas gráficos (Chart.js), se actualizan aquí si ya tienes tus funciones de gráficos creadas
+        // 3. Renderizar y actualizar los gráficos con Chart.js
+        renderizarGraficos(data);
+
     } catch (error) {
         console.error("Error:", error);
     }
 }
 
+// Función para inicializar/actualizar los gráficos de Chart.js
+function renderizarGraficos(data) {
+    // Gráfico de Crecimiento de Ganancias (Barras)
+    const ctxRevenue = document.getElementById('adminRevenueChart');
+    if (ctxRevenue) {
+        if (revenueChartInstance) revenueChartInstance.destroy();
+
+        const meses = data.meses || ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul'];
+        const gananciasMes = data.ganancias_mes || [120, 220, 400, 580, 790, 940, Number(data.ganancias_totales || 1230)];
+
+        revenueChartInstance = new Chart(ctxRevenue, {
+            type: 'bar',
+            data: {
+                labels: meses,
+                datasets: [{
+                    label: 'Ganancias ($)',
+                    data: gananciasMes,
+                    backgroundColor: '#34d399',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+                    y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Productos por Categoría (Dona)
+    const ctxCategory = document.getElementById('adminCategoryChart');
+    if (ctxCategory) {
+        if (categoryChartInstance) categoryChartInstance.destroy();
+
+        const categoriasLabels = data.categorias_labels || ['Tecnología', 'Hogar', 'Moda', 'Otros'];
+        const categoriasData = data.categorias_data || [2, 1, 1, 1];
+
+        categoryChartInstance = new Chart(ctxCategory, {
+            type: 'doughnut',
+            data: {
+                labels: categoriasLabels,
+                datasets: [{
+                    data: categoriasData,
+                    backgroundColor: ['#818cf8', '#34d399', '#fbbf24', '#f43f5e'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { color: '#9ca3af', boxWidth: 12 } }
+                }
+            }
+        });
+    }
+}
+
+// Función para cambiar el rol comunicándose con el backend
+async function cambiarRolUsuario(usuarioId, nuevoRol) {
+    try {
+        const response = await fetch(`/api/admin/usuarios/${usuarioId}/rol`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rol: nuevoRol })
+        });
+
+        if (!response.ok) throw new Error("No se pudo actualizar el rol del usuario");
+
+        // Recarga los datos y los gráficos automáticamente
+        cargarAdminData();
+    } catch (error) {
+        alert(error.message);
+    }
+}
 // Función para cambiar el rol comunicándose con el backend
 async function cambiarRolUsuario(usuarioId, nuevoRol) {
     try {
