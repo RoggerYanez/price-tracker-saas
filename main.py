@@ -153,7 +153,6 @@ def tarea_scraping_automatico():
             prod_id, nombre, url = prod
             precio_encontrado = extraer_precio_universal(url)
             
-            # Hora local de Perú aplicada aquí
             fecha_actual = datetime.now(ZoneInfo("America/Lima")).strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute(
                 "INSERT INTO historial_precios (producto, precio, fecha) VALUES (%s, %s, %s)",
@@ -311,6 +310,22 @@ def agregar_producto(item: NuevoProducto):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     
+    # Validación del modelo Freemium (Límite de 2 productos para cuentas estándar)
+    cursor.execute("SELECT rol FROM usuarios WHERE username = %s", (item.username,))
+    res_usuario = cursor.fetchone()
+    rol_usuario = res_usuario[0] if res_usuario else 'cliente'
+    
+    if rol_usuario not in ['admin', 'cliente_pro']:
+        cursor.execute("SELECT COUNT(*) FROM productos_configurados WHERE username = %s", (item.username,))
+        total_prods = cursor.fetchone()[0]
+        if total_prods >= 2:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(
+                status_code=403, 
+                detail="Has alcanzado el límite de 2 productos gratuitos. ¡Actualiza tu cuenta a Pro para monitoreo ilimitado!"
+            )
+
     cursor.execute(
         "INSERT INTO productos_configurados (username, nombre, url, categoria, precio_objetivo, estado) VALUES (%s, %s, %s, %s, %s, 'activo')",
         (item.username, item.nombre, item.url, item.categoria, item.precio_objetivo)
@@ -320,7 +335,6 @@ def agregar_producto(item: NuevoProducto):
     # Extracción automática y universal del precio
     precio_encontrado = extraer_precio_universal(item.url)
 
-    # Hora local de Perú aplicada aquí también
     fecha_actual = datetime.now(ZoneInfo("America/Lima")).strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
         "INSERT INTO historial_precios (producto, precio, fecha) VALUES (%s, %s, %s)",

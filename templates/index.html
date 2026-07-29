@@ -6,10 +6,13 @@
     <title>PriceTracker PRO - Panel</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js para Gráficos -->
+    <!-- Chart.js (Solo para gráficos de administración) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen relative">
+
+    <!-- Sistema de Notificaciones Toast -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2"></div>
 
     <!-- Contenedor Principal de Autenticación -->
     <div id="auth-container" class="flex items-center justify-center min-h-screen p-4">
@@ -32,7 +35,9 @@
                     <label class="block text-sm font-medium text-gray-300 mb-1">Contraseña</label>
                     <input type="password" id="password" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
                 </div>
-                <button type="submit" id="auth-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded transition duration-200">Iniciar Sesión</button>
+                <button type="submit" id="auth-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded transition duration-200 flex items-center justify-center space-x-2">
+                    <span>Iniciar Sesión</span>
+                </button>
             </form>
 
             <div class="text-center mt-4">
@@ -93,11 +98,14 @@
             </form>
         </div>
 
+        <!-- Barra de Búsqueda y Filtros de Productos -->
+        <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 shadow flex flex-col md:flex-row justify-between items-center gap-4">
+            <h2 class="text-lg font-semibold text-indigo-300">Mis Productos Monitoreados</h2>
+            <input type="text" id="busqueda-producto" oninput="filtrarProductos()" placeholder="Buscar por nombre o categoría..." class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm w-full md:w-72 focus:outline-none focus:border-indigo-500">
+        </div>
+
         <!-- Tabla Productos -->
         <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden mb-8 shadow">
-            <div class="p-4 border-b border-gray-700 bg-gray-800/50">
-                <h2 class="text-lg font-semibold text-indigo-300">Mis Productos Monitoreados</h2>
-            </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
@@ -116,14 +124,43 @@
             </div>
         </div>
 
-        <!-- Gráfico Completo con Línea de Precio Objetivo -->
-        <div id="chart-section" class="bg-gray-800 p-6 rounded-xl border border-gray-700 hidden shadow">
-            <div class="flex justify-between items-center mb-4">
+        <!-- Panel de Resumen Estadístico y Tabla de Historial Limpia -->
+        <div id="chart-section" class="bg-gray-800 p-6 rounded-xl border border-gray-700 hidden shadow mb-8">
+            <div class="flex justify-between items-center mb-6">
                 <h2 id="chart-title" class="text-lg font-semibold text-indigo-300">Historial de Precios</h2>
-                <button onclick="cerrarGrafico()" class="text-gray-400 hover:text-white text-sm font-semibold">Cerrar Gráfico</button>
+                <button onclick="cerrarGrafico()" class="bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded text-sm font-semibold transition">Cerrar Panel</button>
             </div>
-            <div class="relative h-72">
-                <canvas id="priceChart"></canvas>
+
+            <!-- Tarjetas de Estadísticas Clave -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-gray-700/40 p-4 rounded-lg border border-gray-600">
+                    <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Precio Mínimo Registrado</p>
+                    <h3 id="stat-min" class="text-2xl font-bold text-emerald-400 mt-1">$0.00</h3>
+                </div>
+                <div class="bg-gray-700/40 p-4 rounded-lg border border-gray-600">
+                    <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Precio Máximo Registrado</p>
+                    <h3 id="stat-max" class="text-2xl font-bold text-red-400 mt-1">$0.00</h3>
+                </div>
+                <div class="bg-gray-700/40 p-4 rounded-lg border border-gray-600">
+                    <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Diferencia vs Precio Objetivo</p>
+                    <h3 id="stat-diff" class="text-xl font-bold text-amber-400 mt-1">$0.00</h3>
+                </div>
+            </div>
+
+            <!-- Tabla Cronológica Limpia -->
+            <div class="bg-gray-900/50 rounded-lg border border-gray-700 overflow-hidden">
+                <div class="p-3 bg-gray-700/30 text-xs font-semibold text-gray-300 uppercase">Evolución Cronológica</div>
+                <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-800/80 text-gray-400 text-xs border-b border-gray-700">
+                                <th class="p-3">Fecha y Hora</th>
+                                <th class="p-3">Precio Detectado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historial-tabla" class="divide-y divide-gray-800"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -218,19 +255,37 @@
         let isRegisterMode = false;
         let currentUser = null;
         let currentRole = null;
-        let myChart = null;
         let adminRevChart = null;
         let adminCatChart = null;
         
-        // Variables para control de sondeo automático del gráfico activo
+        let productosCache = [];
         let currentChartProduct = null;
         let currentChartObjective = 0;
+
+        // Sistema de Notificaciones Toast
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600 text-white' : type === 'error' ? 'bg-red-600 text-white' : 'bg-indigo-600 text-white';
+            toast.className = `${bgClass} px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition transform translate-y-2 opacity-0 duration-300`;
+            toast.innerText = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
         function toggleAuthMode() {
             isRegisterMode = !isRegisterMode;
             document.getElementById('auth-subtitle').innerText = isRegisterMode ? "Crea una nueva cuenta de cliente" : "Inicia sesión en tu cuenta";
             document.getElementById('email-field').classList.toggle('hidden', !isRegisterMode);
-            document.getElementById('auth-btn').innerText = isRegisterMode ? "Crear Cuenta" : "Iniciar Sesión";
+            document.getElementById('auth-btn').querySelector('span').innerText = isRegisterMode ? "Crear Cuenta" : "Iniciar Sesión";
             document.getElementById('toggle-mode-btn').innerText = isRegisterMode ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Regístrate aquí";
             document.getElementById('error-msg').classList.add('hidden');
         }
@@ -256,7 +311,7 @@
                 if (!res.ok) throw new Error(data.detail || 'Error en la autenticación');
 
                 if (isRegisterMode) {
-                    alert('Registro exitoso. Ahora inicia sesión.');
+                    showToast('Registro exitoso. Inicia sesión.', 'success');
                     toggleAuthMode();
                 } else {
                     currentUser = data.username;
@@ -283,56 +338,65 @@
         async function cargarProductosCliente() {
             try {
                 const res = await fetch(`/api/productos?username=${encodeURIComponent(currentUser)}&rol=${encodeURIComponent(currentRole)}`);
-                const productos = await res.json();
-                const tbody = document.getElementById('productos-tabla');
-                tbody.innerHTML = '';
-
-                let total = productos.length;
-                let activos = productos.filter(p => p.estado === 'activo').length;
-                let alertas = productos.filter(p => p.precio > 0 && p.precio_objetivo > 0 && p.precio <= p.precio_objetivo).length;
-
-                document.getElementById('client-stat-total').innerText = total;
-                document.getElementById('client-stat-activos').innerText = activos;
-                document.getElementById('client-stat-alertas').innerText = alertas;
-
-                if (total === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">No hay productos registrados.</td></tr>`;
-                    return;
-                }
-
-                productos.forEach(p => {
-                    const alerta = p.precio > 0 && p.precio_objetivo > 0 && p.precio <= p.precio_objetivo;
-                    const tr = document.createElement('tr');
-                    tr.className = "hover:bg-gray-700/30 transition";
-                    tr.innerHTML = `
-                        <td class="p-3 font-medium text-white">${p.producto}</td>
-                        <td class="p-3"><span class="bg-gray-700 px-2 py-1 rounded text-xs">${p.categoria}</span></td>
-                        <td class="p-3 font-bold ${alerta ? 'text-emerald-400' : 'text-indigo-300'}">$${p.precio.toFixed(2)} ${alerta ? '🔥 ¡Alerta!' : ''}</td>
-                        <td class="p-3 text-gray-300">$${p.precio_objetivo.toFixed(2)}</td>
-                        <td class="p-3 text-gray-400 text-xs">${p.fecha}</td>
-                        <td class="p-3"><span class="px-2 py-1 rounded text-xs ${p.estado === 'activo' ? 'bg-emerald-900 text-emerald-300' : 'bg-amber-900 text-amber-300'}">${p.estado}</span></td>
-                        <td class="p-3 space-x-2">
-                            <button onclick="verHistorial('${p.producto}', ${p.precio_objetivo})" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded text-xs text-white">Gráfico</button>
-                            <button onclick="cambiarEstado(${p.id}, '${p.estado}')" class="bg-amber-600 hover:bg-amber-500 px-2.5 py-1 rounded text-xs text-white">${p.estado === 'activo' ? 'Pausar' : 'Activar'}</button>
-                            <button onclick="eliminarProducto(${p.id})" class="bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded text-xs text-white">Eliminar</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                productosCache = await res.json();
+                renderizarTablaProductos(productosCache);
             } catch (err) {
                 console.error("Error al cargar productos:", err);
             }
         }
 
-        // Configurar actualización automática cada 10 segundos (incluyendo tabla, estadísticas y gráfico activo)
+        function renderizarTablaProductos(productos) {
+            const tbody = document.getElementById('productos-tabla');
+            tbody.innerHTML = '';
+
+            let total = productos.length;
+            let activos = productos.filter(p => p.estado === 'activo').length;
+            let alertas = productos.filter(p => p.precio > 0 && p.precio_objetivo > 0 && p.precio <= p.precio_objetivo).length;
+
+            document.getElementById('client-stat-total').innerText = total;
+            document.getElementById('client-stat-activos').innerText = activos;
+            document.getElementById('client-stat-alertas').innerText = alertas;
+
+            if (total === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">No hay productos registrados.</td></tr>`;
+                return;
+            }
+
+            productos.forEach(p => {
+                const alerta = p.precio > 0 && p.precio_objetivo > 0 && p.precio <= p.precio_objetivo;
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-700/30 transition";
+                tr.innerHTML = `
+                    <td class="p-3 font-medium text-white">${p.producto}</td>
+                    <td class="p-3"><span class="bg-gray-700 px-2 py-1 rounded text-xs">${p.categoria}</span></td>
+                    <td class="p-3 font-bold ${alerta ? 'text-emerald-400' : 'text-indigo-300'}">$${p.precio.toFixed(2)} ${alerta ? '🔥 ¡Alerta!' : ''}</td>
+                    <td class="p-3 text-gray-300">$${p.precio_objetivo.toFixed(2)}</td>
+                    <td class="p-3 text-gray-400 text-xs">${p.fecha}</td>
+                    <td class="p-3"><span class="px-2 py-1 rounded text-xs ${p.estado === 'activo' ? 'bg-emerald-900 text-emerald-300' : 'bg-amber-900 text-amber-300'}">${p.estado}</span></td>
+                    <td class="p-3 space-x-2">
+                        <button onclick="verHistorial('${p.producto}', ${p.precio_objetivo})" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded text-xs text-white">Historial</button>
+                        <button onclick="cambiarEstado(${p.id}, '${p.estado}')" class="bg-amber-600 hover:bg-amber-500 px-2.5 py-1 rounded text-xs text-white">${p.estado === 'activo' ? 'Pausar' : 'Activar'}</button>
+                        <button onclick="eliminarProducto(${p.id})" class="bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded text-xs text-white">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filtrarProductos() {
+            const query = document.getElementById('busqueda-producto').value.toLowerCase();
+            const filtrados = productosCache.filter(p => 
+                p.producto.toLowerCase().includes(query) || p.categoria.toLowerCase().includes(query)
+            );
+            renderizarTablaProductos(filtrados);
+        }
+
+        // Sondeo automático cada 10 segundos
         setInterval(() => {
-            if (typeof cargarProductosCliente === 'function' && currentUser && currentRole !== 'admin') {
+            if (currentUser && currentRole !== 'admin') {
                 cargarProductosCliente();
-                console.log("Tabla actualizada automáticamente en segundo plano.");
-                
-                // Actualizar el gráfico activo si hay uno abierto
                 if (currentChartProduct) {
-                    actualizarGraficoActual();
+                    actualizarHistorialActual();
                 }
             }
         }, 10000);
@@ -355,9 +419,10 @@
                 document.getElementById('prod-url').value = '';
                 document.getElementById('prod-categoria').value = '';
                 document.getElementById('prod-objetivo').value = '';
+                showToast('Producto registrado exitosamente', 'success');
                 cargarProductosCliente();
             } catch (err) {
-                alert(err.message);
+                showToast(err.message, 'error');
             }
         }
 
@@ -368,80 +433,81 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ estado: nuevoEstado })
             });
+            showToast('Estado actualizado', 'info');
             cargarProductosCliente();
         }
 
         async function eliminarProducto(id) {
             if (!confirm('¿Estás seguro de eliminar este producto?')) return;
             await fetch(`/api/productos/${id}`, { method: 'DELETE' });
+            showToast('Producto eliminado', 'success');
             cargarProductosCliente();
         }
 
-        async function actualizarGraficoActual() {
+        // --- Historial Estadístico y Tabla Cronológica ---
+        async function actualizarHistorialActual() {
             if (!currentChartProduct) return;
             try {
                 const res = await fetch(`/api/historial/${encodeURIComponent(currentChartProduct)}`);
                 const historial = await res.json();
                 
-                const labels = historial.map(h => h.fecha);
+                const tbody = document.getElementById('historial-tabla');
+                tbody.innerHTML = '';
+
+                if (historial.length === 0) {
+                    document.getElementById('stat-min').innerText = '$0.00';
+                    document.getElementById('stat-max').innerText = '$0.00';
+                    document.getElementById('stat-diff').innerText = 'N/A';
+                    tbody.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-gray-400">No hay registros de historial disponibles.</td></tr>`;
+                    return;
+                }
+
                 const precios = historial.map(h => h.precio);
-                const objetivos = labels.map(() => currentChartObjective);
+                const precioMin = Math.min(...precios);
+                const precioMax = Math.max(...precios);
+                const ultimoPrecio = precios[precios.length - 1];
 
-                const ctx = document.getElementById('priceChart').getContext('2d');
-                if (myChart) myChart.destroy();
+                // Cálculo de la diferencia vs Precio Objetivo
+                const diferencia = ultimoPrecio - currentChartObjective;
+                let diffText = "";
+                if (diferencia > 0) {
+                    diffText = `Estás a $${diferencia.toFixed(2)} de tu meta`;
+                } else if (diferencia === 0) {
+                    diffText = `¡En tu precio objetivo exacto!`;
+                } else {
+                    diffText = `¡Meta superada por $${Math.abs(diferencia).toFixed(2)}!`;
+                }
 
-                myChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: 'Precio Actual ($)',
-                                data: precios,
-                                borderColor: '#818cf8',
-                                backgroundColor: 'rgba(129, 140, 248, 0.1)',
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.1
-                            },
-                            {
-                                label: 'Precio Objetivo ($)',
-                                data: objetivos,
-                                borderColor: '#fbbf24',
-                                borderWidth: 2,
-                                borderDash: [5, 5],
-                                pointRadius: 0,
-                                fill: false
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: { grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
-                            x: { grid: { color: '#374151' }, ticks: { color: '#9ca3af' } }
-                        }
-                    }
+                document.getElementById('stat-min').innerText = `$${precioMin.toFixed(2)}`;
+                document.getElementById('stat-max').innerText = `$${precioMax.toFixed(2)}`;
+                document.getElementById('stat-diff').innerText = diffText;
+
+                // Llenar tabla cronológica
+                historial.forEach(h => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-800/50 transition";
+                    tr.innerHTML = `
+                        <td class="p-3 text-gray-300">${h.fecha}</td>
+                        <td class="p-3 font-semibold text-white">$${h.precio.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
                 });
-                console.log("Gráfico actualizado automáticamente en segundo plano.");
             } catch (err) {
-                console.error("Error al actualizar el gráfico en segundo plano:", err);
+                console.error("Error al actualizar el historial:", err);
             }
         }
 
         async function verHistorial(nombreProducto, precioObjetivo = 0) {
             currentChartProduct = nombreProducto;
             currentChartObjective = precioObjetivo;
-            document.getElementById('chart-title').innerText = `Evolución de Precio: ${nombreProducto}`;
+            document.getElementById('chart-title').innerText = `Panel de Historial: ${nombreProducto}`;
             document.getElementById('chart-section').classList.remove('hidden');
-            await actualizarGraficoActual();
+            await actualizarHistorialActual();
         }
 
         function cerrarGrafico() {
             currentChartProduct = null;
             document.getElementById('chart-section').classList.add('hidden');
-            if (myChart) myChart.destroy();
         }
 
         function exportarCSV() {
@@ -454,13 +520,11 @@
                 const res = await fetch('/api/admin/data');
                 const data = await res.json();
 
-                // Actualizar tarjetas de negocio
                 document.getElementById('admin-stat-ganancias').innerText = `$${data.ganancias_totales.toFixed(2)}`;
                 document.getElementById('admin-stat-clientes').innerText = data.total_clientes;
                 document.getElementById('admin-stat-productos').innerText = data.total_productos;
                 document.getElementById('admin-stat-alertas').innerText = data.total_alertas;
 
-                // Llenar tabla de clientes
                 const tbody = document.getElementById('admin-clientes-tabla');
                 tbody.innerHTML = '';
                 if (data.clientes.length === 0) {
@@ -483,16 +547,13 @@
                     });
                 }
 
-                // Renderizar Gráficos de Admin
                 renderAdminCharts(data);
-
             } catch (err) {
                 console.error("Error al cargar datos del admin:", err);
             }
         }
 
         function renderAdminCharts(data) {
-            // Gráfico de Ganancias
             const ctxRev = document.getElementById('adminRevenueChart').getContext('2d');
             if (adminRevChart) adminRevChart.destroy();
             adminRevChart = new Chart(ctxRev, {
@@ -516,7 +577,6 @@
                 }
             });
 
-            // Gráfico de Categorías
             const ctxCat = document.getElementById('adminCategoryChart').getContext('2d');
             if (adminCatChart) adminCatChart.destroy();
             adminCatChart = new Chart(ctxCat, {
@@ -538,6 +598,7 @@
         async function eliminarCliente(id) {
             if (!confirm('¿Estás seguro de eliminar este cliente y sus productos?')) return;
             await fetch(`/api/admin/clientes/${id}`, { method: 'DELETE' });
+            showToast('Cliente eliminado correctamente', 'success');
             cargarAdminData();
         }
 
@@ -550,6 +611,7 @@
             document.getElementById('auth-container').classList.remove('hidden');
             document.getElementById('username').value = '';
             document.getElementById('password').value = '';
+            showToast('Sesión cerrada', 'info');
         }
     </script>
 </body>
