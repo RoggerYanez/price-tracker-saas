@@ -208,6 +208,9 @@ class RegisterData(BaseModel):
 class EstadoProducto(BaseModel):
     estado: str
 
+class RolData(BaseModel):
+    rol: str
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse(request, "index.html")
@@ -310,7 +313,7 @@ def agregar_producto(item: NuevoProducto):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     
-    # 1. Verificar el rol y restricciones Freemium (Límite de 2 productos para clientes estándar)
+    # 1. Verificar el rol y restricciones Freemium (Solo restringe si el rol es estrictamente 'cliente')
     cursor.execute("SELECT rol FROM usuarios WHERE username = %s", (item.username,))
     res_usuario = cursor.fetchone()
     
@@ -333,7 +336,7 @@ def agregar_producto(item: NuevoProducto):
                 detail="LÍMITE_GRATIS_ALCANZADO"
             )
 
-    # 2. Insertar el producto si pasa la validación
+    # 2. Insertar el producto si pasa la validación (admin y pro pasan sin restricciones)
     cursor.execute(
         "INSERT INTO productos_configurados (username, nombre, url, categoria, precio_objetivo, estado) VALUES (%s, %s, %s, %s, %s, 'activo')",
         (item.username, item.nombre, item.url, item.categoria, item.precio_objetivo)
@@ -409,6 +412,7 @@ def logica_admin_data():
     clientes = []
     total_productos = 0
     total_alertas = 0
+    total_pro = 0
     
     for u in usuarios_db:
         cursor.execute("""
@@ -426,6 +430,9 @@ def logica_admin_data():
         total_productos += prod_count
         total_alertas += alertas_count
         
+        if u[3] == 'pro':
+            total_pro += 1
+        
         clientes.append({
             "id": u[0],
             "username": u[1],
@@ -435,7 +442,7 @@ def logica_admin_data():
             "productos_registrados": prod_count
         })
     
-    ganancias_totales = len(clientes) * 29.90
+    ganancias_totales = total_pro * 29.90
     
     cursor.close()
     conexion.close()
@@ -456,6 +463,19 @@ def logica_admin_data():
 @app.get("/api/admin/clientes")
 def get_admin_data():
     return logica_admin_data()
+
+@app.patch("/api/admin/usuarios/{usuario_id}/rol")
+def cambiar_rol_usuario(usuario_id: int, data: RolData):
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+    cursor.execute(
+        "UPDATE usuarios SET rol = %s WHERE id = %s",
+        (data.rol, usuario_id)
+    )
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+    return {"mensaje": f"Rol actualizado a {data.rol}"}
 
 @app.delete("/api/admin/clientes/{cliente_id}")
 def eliminar_cliente(cliente_id: int):
