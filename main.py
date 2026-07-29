@@ -2,6 +2,7 @@ import os
 import csv
 import io
 import re
+import json
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -67,6 +68,69 @@ def inicializar_bd():
     print("Base de datos PostgreSQL inicializada con éxito.")
 
 # ==========================================
+# FUNCIÓN DE SCRAPING UNIVERSAL INTELIGENTE
+# ==========================================
+def extraer_precio_universal(url: str) -> float:
+    """Función universal que intenta extraer el precio de cualquier tienda online real (electrodomésticos, libros, videojuegos, etc.)."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=12)
+        if response.status_code != 200:
+            return 0.0
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # ESTRATEGIA 1: Buscar en datos estructurados (JSON-LD / Schema.org)
+        for script in soup.find_all('script', type='application/ld+json'):
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, list):
+                    data = data[0]
+                if isinstance(data, dict):
+                    if data.get('@type') == 'Product' and 'offers' in data:
+                        offers = data['offers']
+                        if isinstance(offers, list):
+                            precio = offers[0].get('price') or offers[0].get('highPrice')
+                        elif isinstance(offers, dict):
+                            precio = offers.get('price')
+                        if precio:
+                            return float(str(precio).replace(",", ""))
+            except Exception:
+                pass
+
+        # ESTRATEGIA 2: Probar selectores CSS comunes en tiendas de e-commerce globales y locales
+        selectores_comunes = [
+            "[itemprop='price']",
+            ".price",
+            "#price",
+            ".precio",
+            ".current-price",
+            ".product-price",
+            ".andes-money-amount__fraction", # Muy utilizado en MercadoLibre y plataformas de LATAM
+            ".price_color"
+        ]
+        
+        for sel in selectores_comunes:
+            elemento = soup.select_one(sel)
+            if elemento:
+                texto = elemento.text.strip().replace(",", "")
+                match = re.search(r"[\d\.]+", texto)
+                if match:
+                    try:
+                        val = float(match.group())
+                        if val > 0:
+                            return val
+                    except ValueError:
+                        continue
+
+    except Exception as e:
+        print(f"Error haciendo scraping universal para {url}: {e}")
+    
+    return 0.0
+
+# ==========================================
 # CONFIGURACIÓN DEL PLANIFICADOR AUTOMÁTICO
 # ==========================================
 scheduler = BackgroundScheduler()
@@ -85,24 +149,9 @@ def tarea_scraping_automatico():
         cursor.execute("SELECT id, nombre, url FROM productos_configurados WHERE estado = 'activo'")
         productos = cursor.fetchall()
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        
         for prod in productos:
             prod_id, nombre, url = prod
-            precio_encontrado = 0.0
-            try:
-                response = requests.get(url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    elemento_precio = soup.select_one(".price_color")
-                    if elemento_precio:
-                        match = re.search(r"[\d\.]+", elemento_precio.text)
-                        if match:
-                            precio_encontrado = float(match.group())
-            except Exception as e:
-                print(f"Error haciendo scraping automático para {nombre}: {e}")
+            precio_encontrado = extraer_precio_universal(url)
             
             # Hora local de Perú aplicada aquí
             fecha_actual = datetime.now(ZoneInfo("America/Lima")).strftime("%Y-%m-%d %H:%M:%S")
@@ -268,21 +317,8 @@ def agregar_producto(item: NuevoProducto):
     )
     conexion.commit()
 
-    precio_encontrado = 0.0
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        response = requests.get(item.url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            elemento_precio = soup.select_one(".price_color")
-            if elemento_precio:
-                match = re.search(r"[\d\.]+", elemento_precio.text)
-                if match:
-                    precio_encontrado = float(match.group())
-    except Exception as e:
-        print(f"Error en scraping inicial: {e}")
+    # Extracción automática y universal del precio
+    precio_encontrado = extraer_precio_universal(item.url)
 
     # Hora local de Perú aplicada aquí también
     fecha_actual = datetime.now(ZoneInfo("America/Lima")).strftime("%Y-%m-%d %H:%M:%S")
