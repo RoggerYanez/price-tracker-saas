@@ -281,6 +281,60 @@
         </div>
     </div>
 
+    <!-- Script para renderizar la tabla con los botones Pro y función de actualización -->
+    <script>
+        // Asegúrate de que esta función esté conectada al llamado de tus datos de admin
+        function renderizarClientesAdmin(clientes) {
+            const tbody = document.getElementById('admin-clientes-tabla');
+            if (!tbody) return;
+
+            let filasHtml = '';
+            clientes.forEach(cliente => {
+                let botonRol = cliente.rol === 'pro' 
+                    ? `<button onclick="cambiarRolUsuario(${cliente.id}, 'cliente')" class="bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs font-semibold mr-2 transition">Quitar Pro</button>`
+                    : `<button onclick="cambiarRolUsuario(${cliente.id}, 'pro')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs font-semibold mr-2 transition">Hacer Pro</button>`;
+
+                filasHtml += `
+                    <tr>
+                        <td class="p-3">#${cliente.id}</td>
+                        <td class="p-3">${cliente.username}</td>
+                        <td class="p-3">${cliente.email}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-1 rounded text-xs ${cliente.rol === 'pro' ? 'bg-indigo-900 text-indigo-200 font-bold' : 'bg-gray-700 text-gray-300'}">${cliente.rol}</span>
+                        </td>
+                        <td class="p-3">${cliente.productos_registrados} productos</td>
+                        <td class="p-3">
+                            ${botonRol}
+                            <button onclick="eliminarCliente(${cliente.id})" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded text-xs font-semibold transition">Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = filasHtml;
+        }
+
+        async function cambiarRolUsuario(usuarioId, nuevoRol) {
+            try {
+                const response = await fetch(`/api/admin/usuarios/${usuarioId}/rol`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rol: nuevoRol })
+                });
+
+                if (!response.ok) throw new Error("No se pudo actualizar el rol del usuario");
+
+                // Recargamos los datos del panel para reflejar el cambio en tiempo real
+                if (typeof cargarAdminData === 'function') {
+                    cargarAdminData();
+                } else {
+                    location.reload();
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+    </script>
+
     <script>
         let isRegisterMode = false;
         let currentUser = null;
