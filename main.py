@@ -310,29 +310,37 @@ def agregar_producto(item: NuevoProducto):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     
-    # Validación del modelo Freemium (Límite de 2 productos para cuentas estándar)
+    # 1. Verificar el rol y restricciones Freemium (Límite de 2 productos para clientes estándar)
     cursor.execute("SELECT rol FROM usuarios WHERE username = %s", (item.username,))
     res_usuario = cursor.fetchone()
-    rol_usuario = res_usuario[0] if res_usuario else 'cliente'
     
-    if rol_usuario not in ['admin', 'cliente_pro']:
+    if not res_usuario:
+        cursor.close()
+        conexion.close()
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    rol_usuario = res_usuario[0]
+
+    if rol_usuario == 'cliente':
         cursor.execute("SELECT COUNT(*) FROM productos_configurados WHERE username = %s", (item.username,))
         total_prods = cursor.fetchone()[0]
+        
         if total_prods >= 2:
             cursor.close()
             conexion.close()
             raise HTTPException(
                 status_code=403, 
-                detail="Has alcanzado el límite de 2 productos gratuitos. ¡Actualiza tu cuenta a Pro para monitoreo ilimitado!"
+                detail="LÍMITE_GRATIS_ALCANZADO"
             )
 
+    # 2. Insertar el producto si pasa la validación
     cursor.execute(
         "INSERT INTO productos_configurados (username, nombre, url, categoria, precio_objetivo, estado) VALUES (%s, %s, %s, %s, %s, 'activo')",
         (item.username, item.nombre, item.url, item.categoria, item.precio_objetivo)
     )
     conexion.commit()
 
-    # Extracción automática y universal del precio
+    # Extracción automática y universal del precio inicial
     precio_encontrado = extraer_precio_universal(item.url)
 
     fecha_actual = datetime.now(ZoneInfo("America/Lima")).strftime("%Y-%m-%d %H:%M:%S")

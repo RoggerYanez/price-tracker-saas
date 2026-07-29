@@ -163,6 +163,36 @@
                 </div>
             </div>
         </div>
+
+        <!-- Modal de Actualización a Pro (Yape / Plin) -->
+        <div id="modal-pro" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 border border-gray-700 rounded-xl max-w-md w-full p-6 shadow-2xl text-center">
+                <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">⭐</div>
+                <h3 class="text-xl font-bold text-white mb-2">¡Límite del Plan Gratuito Alcanzado!</h3>
+                <p class="text-gray-300 text-sm mb-6 leading-relaxed">
+                    Has alcanzado el límite de 2 productos en tu versión gratuita. Desbloquea <span class="text-indigo-400 font-semibold">Monitoreo Ilimitado</span> por solo <span class="text-emerald-400 font-bold">S/ 29.90 / mes</span>.
+                </p>
+                
+                <div class="bg-gray-900/60 p-4 rounded-lg border border-gray-700 text-left mb-6 text-sm space-y-2">
+                    <p class="text-gray-300 font-medium">📱 Paga por Yape o Plin:</p>
+                    <p class="text-indigo-300 font-bold text-center text-lg tracking-wider">987 654 321</p>
+                    <p class="text-gray-400 text-xs text-center">Titular: PriceTracker PRO S.A.C.</p>
+                </div>
+
+                <p class="text-gray-400 text-xs mb-6">
+                    Realiza la transferencia y envíanos el voucher por WhatsApp para activar tu cuenta Pro de forma inmediata.
+                </p>
+
+                <div class="flex space-x-3">
+                    <a href="https://wa.me/51987654321?text=Hola,%20acabo%20de%20pagar%20mi%20suscripción%20Pro%20de%20PriceTracker%20con%20mi%20cuenta:%20" target="_blank" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition text-center shadow">
+                        Enviar Voucher por WhatsApp
+                    </a>
+                    <button onclick="cerrarModalPro()" class="bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ========================================== -->
@@ -410,11 +440,23 @@
 
             try {
                 const res = await fetch('/api/agregar-producto', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUser, nombre, url, categoria, precio_objetivo })
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser, nombre, url, categoria, precio_objetivo })
                 });
-                if (!res.ok) throw new Error('Error al registrar producto');
+
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+            
+                    // Si el backend indica que se alcanzó el límite gratuito, mostramos el modal Pro
+                    if (errorData.detail === "LÍMITE_GRATIS_ALCANZADO") {
+                        document.getElementById('modal-pro').classList.remove('hidden');
+                        return;
+                    }
+            
+                    throw new Error(errorData.detail || 'Error al registrar producto');
+                }
+
                 document.getElementById('prod-nombre').value = '';
                 document.getElementById('prod-url').value = '';
                 document.getElementById('prod-categoria').value = '';
@@ -424,6 +466,11 @@
             } catch (err) {
                 showToast(err.message, 'error');
             }
+        }
+
+        // Función auxiliar para cerrar el modal de actualización Pro
+        function cerrarModalPro() {
+            document.getElementById('modal-pro').classList.add('hidden');
         }
 
         async function cambiarEstado(id, estadoActual) {
