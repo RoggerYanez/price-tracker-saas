@@ -5,6 +5,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import psycopg2
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -103,7 +104,8 @@ def tarea_scraping_automatico():
             except Exception as e:
                 print(f"Error haciendo scraping automático para {nombre}: {e}")
             
-            fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Hora local de Perú aplicada aquí
+            fecha_actual = datetime.now(ZoneInfo("America/Lima")).strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute(
                 "INSERT INTO historial_precios (producto, precio, fecha) VALUES (%s, %s, %s)",
                 (nombre, precio_encontrado, fecha_actual)
@@ -282,7 +284,8 @@ def agregar_producto(item: NuevoProducto):
     except Exception as e:
         print(f"Error en scraping inicial: {e}")
 
-    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Hora local de Perú aplicada aquí también
+    fecha_actual = datetime.now(ZoneInfo("America/Lima")).strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
         "INSERT INTO historial_precios (producto, precio, fecha) VALUES (%s, %s, %s)",
         (item.nombre, precio_encontrado, fecha_actual)
