@@ -1,278 +1,544 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control y Seguimiento de Precios</title>
+    <title>PriceTracker PRO - Panel</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen relative">
 
-    <!-- Contenedor de Autenticación (Login / Registro) -->
-    <div id="auth-container" class="flex items-center justify-center flex-grow p-4">
-        <div class="bg-gray-900 border border-gray-800 p-8 rounded-xl shadow-xl w-full max-w-md">
-            <h2 class="text-2xl font-bold text-center mb-6 text-indigo-400">Iniciar Sesión</h2>
-            <div class="space-y-4">
+    <!-- Sistema de Notificaciones Toast -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2"></div>
+
+    <!-- Contenedor Principal de Autenticación -->
+    <div id="auth-container" class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700">
+            <h1 class="text-3xl font-bold text-center mb-2 text-indigo-400">PriceTracker <span class="text-xs bg-indigo-600 px-2 py-1 rounded text-white">PRO</span></h1>
+            <p id="auth-subtitle" class="text-center text-gray-400 mb-6">Inicia sesión en tu cuenta</p>
+            
+            <div id="error-msg" class="hidden bg-red-500/20 border border-red-500 text-red-300 p-3 rounded mb-4 text-sm"></div>
+
+            <form id="auth-form" onsubmit="handleAuth(event)" class="space-y-4">
+                <div id="email-field" class="hidden">
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Correo Electrónico</label>
+                    <input type="email" id="email" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Usuario</label>
-                    <input type="text" id="username" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500" placeholder="Tu nombre de usuario">
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Nombre de Usuario</label>
+                    <input type="text" id="username" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1">Contraseña</label>
-                    <input type="password" id="password" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500" placeholder="••••••••">
+                    <input type="password" id="password" required class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
                 </div>
-                <button onclick="login()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 rounded transition">Ingresar</button>
+                <button type="submit" id="auth-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded transition duration-200 flex items-center justify-center space-x-2">
+                    <span>Iniciar Sesión</span>
+                </button>
+            </form>
+
+            <div class="text-center mt-4">
+                <button onclick="toggleAuthMode()" id="toggle-mode-btn" class="text-sm text-indigo-400 hover:underline">¿No tienes cuenta? Regístrate aquí</button>
             </div>
         </div>
     </div>
 
-    <!-- Panel de Cliente -->
-    <div id="client-dashboard" class="hidden flex-grow p-6 max-w-7xl mx-auto w-full">
-        <div class="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-            <h1 class="text-3xl font-bold text-white">Panel de Cliente</h1>
-            <button onclick="logout()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded text-sm font-semibold transition">Cerrar Sesión</button>
-        </div>
+    <!-- ========================================== -->
+    <!-- PANEL DE CLIENTE (DASHBOARD CLIENTE)       -->
+    <!-- ========================================== -->
+    <div id="client-dashboard" class="hidden container mx-auto px-4 py-8">
+        <header class="flex justify-between items-center mb-8 bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
+            <div>
+                <h1 class="text-2xl font-bold text-indigo-400">PriceTracker Dashboard</h1>
+                <p class="text-sm text-gray-400 mt-1">Bienvenido, <span id="client-user-display" class="font-semibold text-white"></span></p>
+            </div>
+            <div class="space-x-2">
+                <button onclick="exportarCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow">Exportar CSV</button>
+                <button onclick="logout()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow">Cerrar Sesión</button>
+            </div>
+        </header>
 
-        <!-- Sección de Planes y Suscripción -->
-        <div class="bg-gray-900 border border-gray-800 p-6 rounded-xl mb-8">
-            <h2 class="text-xl font-semibold mb-4 text-indigo-300">Tu Plan Actual</h2>
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+        <!-- Tarjetas de Resumen Cliente -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
                 <div>
-                    <p class="text-gray-300">Plan activo: <span id="current-plan-badge" class="px-2 py-1 rounded text-xs font-bold bg-gray-700 text-gray-200">Cliente</span></p>
-                    <p class="text-sm text-gray-400 mt-1">Actualiza tu plan para desbloquear características avanzadas.</p>
+                    <p class="text-sm text-gray-400">Total Productos</p>
+                    <h3 id="client-stat-total" class="text-2xl font-bold text-white mt-1">0</h3>
                 </div>
-                <div class="flex gap-3">
-                    <button onclick="seleccionarPlan('cliente')" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm font-semibold transition">Plan Estándar</button>
-                    <button onclick="seleccionarPlan('pro')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded text-sm font-semibold transition">Mejorar a Plan Pro ($9.99)</button>
+                <div class="p-3 bg-indigo-600/20 text-indigo-400 rounded-lg">📦</div>
+            </div>
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Productos Activos</p>
+                    <h3 id="client-stat-activos" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-emerald-600/20 text-emerald-400 rounded-lg">⚡</div>
+            </div>
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Alertas Objetivo</p>
+                    <h3 id="client-stat-alertas" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-amber-600/20 text-amber-400 rounded-lg">🔔</div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- NUEVA SECCIÓN DE 3 PLANES DE SUSCRIPCIÓN   -->
+        <!-- ========================================== -->
+        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 mb-8 shadow">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-indigo-300">Nuestros Planes de Monitoreo</h2>
+                <p class="text-gray-400 text-sm mt-1">Elige el plan que mejor se adapte a tus necesidades de rastreo de precios.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Plan Gratuito -->
+                <div class="bg-gray-900/60 border border-gray-700 rounded-xl p-6 flex flex-col justify-between">
+                    <div>
+                        <span class="bg-gray-700 text-gray-300 text-xs px-2.5 py-1 rounded-full font-semibold">Básico</span>
+                        <h3 class="text-xl font-bold text-white mt-3">Plan Gratuito</h3>
+                        <p class="text-3xl font-extrabold text-indigo-400 mt-2">S/ 0 <span class="text-xs text-gray-400 font-normal">/ siempre</span></p>
+                        <ul class="text-sm text-gray-300 mt-4 space-y-2">
+                            <li>✓ Hasta <strong>2 productos</strong>[cite: 3]</li>
+                            <li>✓ Rastreo automático</li>
+                            <li>✓ Alertas de precio objetivo</li>
+                        </ul>
+                    </div>
+                    <button disabled class="mt-6 w-full bg-gray-700 text-gray-400 font-semibold py-2 rounded-lg text-sm cursor-default">Plan Actual</button>
+                </div>
+
+                <!-- Plan Estándar -->
+                <div class="bg-gray-900/60 border border-indigo-500/50 rounded-xl p-6 flex flex-col justify-between relative shadow-lg">
+                    <div>
+                        <span class="bg-indigo-600 text-white text-xs px-2.5 py-1 rounded-full font-semibold">Popular</span>
+                        <h3 class="text-xl font-bold text-white mt-3">Plan Estándar</h3>
+                        <p class="text-3xl font-extrabold text-indigo-400 mt-2">S/ 14.90 <span class="text-xs text-gray-400 font-normal">/ mes</span></p>
+                        <ul class="text-sm text-gray-300 mt-4 space-y-2">
+                            <li>✓ Hasta <strong>15 productos</strong>[cite: 3]</li>
+                            <li>✓ Historial avanzado</li>
+                            <li>✓ Soporte prioritario</li>
+                        </ul>
+                    </div>
+                    <button onclick="abrirModalPro('estandar')" class="mt-6 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 rounded-lg text-sm transition">Elegir Estándar</button>
+                </div>
+
+                <!-- Plan Pro -->
+                <div class="bg-gray-900/60 border border-emerald-500/50 rounded-xl p-6 flex flex-col justify-between shadow-lg">
+                    <div>
+                        <span class="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-full font-semibold">Ilimitado</span>
+                        <h3 class="text-xl font-bold text-white mt-3">Plan Pro</h3>
+                        <p class="text-3xl font-extrabold text-emerald-400 mt-2">S/ 29.90 <span class="text-xs text-gray-400 font-normal">/ mes</span>[cite: 2]</p>
+                        <ul class="text-sm text-gray-300 mt-4 space-y-2">
+                            <li>✓ Monitoreo <strong>Ilimitado</strong>[cite: 2, 3]</li>
+                            <li>✓ Exportación avanzada de datos</li>
+                            <li>✓ Actualización frecuente</li>
+                        </ul>
+                    </div>
+                    <button onclick="abrirModalPro('pro')" class="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg text-sm transition">Elegir Pro</button>
                 </div>
             </div>
         </div>
 
-        <!-- Sección de Historial y Gráfico de Producto -->
-        <div id="chart-section" class="hidden bg-gray-900 border border-gray-800 p-6 rounded-xl mb-8">
-            <div class="flex justify-between items-center mb-4">
-                <h2 id="chart-title" class="text-xl font-semibold text-white">Panel de Historial</h2>
-                <button onclick="cerrarGrafico()" class="text-gray-400 hover:text-white text-sm font-semibold">Cerrar</button>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-                    <p class="text-xs text-gray-400 uppercase tracking-wider">Precio Mínimo</p>
-                    <p id="stat-min" class="text-2xl font-bold text-emerald-400 mt-1">$0.00</p>
-                </div>
-                <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-                    <p class="text-xs text-gray-400 uppercase tracking-wider">Precio Máximo</p>
-                    <p id="stat-max" class="text-2xl font-bold text-indigo-400 mt-1">$0.00</p>
-                </div>
-                <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-                    <p class="text-xs text-gray-400 uppercase tracking-wider">Diferencia / Meta</p>
-                    <p id="stat-diff" class="text-lg font-bold text-white mt-1">N/A</p>
-                </div>
-            </div>
+        <!-- Formulario Producto -->
+        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 mb-8 shadow">
+            <h2 class="text-lg font-semibold mb-4 text-indigo-300">Configurar Nuevo Producto a Rastrear</h2>
+            <form onsubmit="agregarProducto(event)" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <input type="text" id="prod-nombre" placeholder="Nombre del Producto" required class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                <input type="url" id="prod-url" placeholder="URL de la página a rastrear" required class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                <input type="text" id="prod-categoria" placeholder="Categoría (Ej. Tecnología)" required class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                <input type="number" step="0.01" id="prod-objetivo" placeholder="Precio Objetivo Alerta" required class="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded transition shadow">Registrar Producto</button>
+            </form>
+        </div>
+
+        <!-- Barra de Búsqueda y Filtros de Productos -->
+        <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 shadow flex flex-col md:flex-row justify-between items-center gap-4">
+            <h2 class="text-lg font-semibold text-indigo-300">Mis Productos Monitoreados</h2>
+            <input type="text" id="busqueda-producto" oninput="filtrarProductos()" placeholder="Buscar por nombre o categoría..." class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-white text-sm w-full md:w-72 focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <!-- Tabla Productos -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden mb-8 shadow">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="border-b border-gray-800 text-gray-400 text-sm">
-                            <th class="p-3">Fecha</th>
-                            <th class="p-3">Precio</th>
+                        <tr class="bg-gray-700/50 text-gray-300 text-sm">
+                            <th class="p-3">Producto</th>
+                            <th class="p-3">Categoría</th>
+                            <th class="p-3">Precio Actual</th>
+                            <th class="p-3">Precio Objetivo</th>
+                            <th class="p-3">Última Actualización</th>
+                            <th class="p-3">Estado</th>
+                            <th class="p-3">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="historial-tabla">
-                        <!-- Se llena dinámicamente -->
-                    </tbody>
+                    <tbody id="productos-tabla" class="divide-y divide-gray-700 text-sm"></tbody>
                 </table>
             </div>
         </div>
-        
-        <div class="flex justify-end">
-            <button onclick="exportarCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-semibold transition">Exportar Datos a CSV</button>
+
+        <!-- Panel de Historial Estadístico -->
+        <div id="chart-section" class="bg-gray-800 p-6 rounded-xl border border-gray-700 hidden shadow mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="chart-title" class="text-lg font-semibold text-indigo-300">Historial de Precios</h2>
+                <button onclick="cerrarGrafico()" class="bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded text-sm font-semibold transition">Cerrar Panel</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-gray-700/40 p-4 rounded-lg border border-gray-600">
+                    <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Precio Mínimo Registrado</p>
+                    <h3 id="stat-min" class="text-2xl font-bold text-emerald-400 mt-1">$0.00</h3>
+                </div>
+                <div class="bg-gray-700/40 p-4 rounded-lg border border-gray-600">
+                    <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Precio Máximo Registrado</p>
+                    <h3 id="stat-max" class="text-2xl font-bold text-red-400 mt-1">$0.00</h3>
+                </div>
+                <div class="bg-gray-700/40 p-4 rounded-lg border border-gray-600">
+                    <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Diferencia vs Precio Objetivo</p>
+                    <h3 id="stat-diff" class="text-xl font-bold text-amber-400 mt-1">$0.00</h3>
+                </div>
+            </div>
+
+            <div class="bg-gray-900/50 rounded-lg border border-gray-700 overflow-hidden">
+                <div class="p-3 bg-gray-700/30 text-xs font-semibold text-gray-300 uppercase">Evolución Cronológica</div>
+                <div class="overflow-x-auto max-h-60 overflow-y-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-gray-800/80 text-gray-400 text-xs border-b border-gray-700">
+                                <th class="p-3">Fecha y Hora</th>
+                                <th class="p-3">Precio Detectado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historial-tabla" class="divide-y divide-gray-800"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Actualización a Pro / Estándar (Yape / Plin) -->
+        <div id="modal-pro" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 border border-gray-700 rounded-xl max-w-md w-full p-6 shadow-2xl text-center">
+                <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">⭐</div>
+                <h3 id="modal-title" class="text-xl font-bold text-white mb-2">¡Límite del Plan Alcanzado!</h3>
+                <p id="modal-desc" class="text-gray-300 text-sm mb-6 leading-relaxed">
+                    Has alcanzado el límite de tu plan actual. Desbloquea <span class="text-indigo-400 font-semibold">Monitoreo Avanzado</span> por solo <span class="text-emerald-400 font-bold">S/ 29.90 / mes</span>[cite: 2].
+                </p>
+                
+                <div class="bg-gray-900/60 p-4 rounded-lg border border-gray-700 text-left mb-6 text-sm space-y-2">
+                    <p class="text-gray-300 font-medium">📱 Paga por Yape o Plin:</p>
+                    <p class="text-indigo-300 font-bold text-center text-lg tracking-wider">914 733 566</p>
+                    <p class="text-gray-400 text-xs text-center">Titular: Rogger.Y</p>
+                </div>
+
+                <p class="text-gray-400 text-xs mb-6">
+                    Realiza la transferencia y envíanos el voucher por WhatsApp para activar tu cuenta de inmediato.
+                </p>
+
+                <div class="flex space-x-3">
+                    <a id="whatsapp-btn" href="https://wa.me/51987654321?text=Hola,%20acabo%20de%20pagar%20mi%20suscripción%20de%20PriceTracker%20con%20mi%20cuenta:%20" target="_blank" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition text-center shadow">
+                        Enviar Voucher por WhatsApp
+                    </a>
+                    <button onclick="cerrarModalPro()" class="bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-2.5 rounded-lg text-sm font-semibold transition">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Panel de Administrador -->
-    <div id="admin-dashboard" class="hidden flex-grow p-6 max-w-7xl mx-auto w-full">
-        <div class="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-            <h1 class="text-3xl font-bold text-white">Panel de Administración</h1>
-            <button onclick="logout()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded text-sm font-semibold transition">Cerrar Sesión</button>
+    <!-- ========================================== -->
+    <!-- PANEL DE ADMINISTRADOR (ADMIN DASHBOARD)   -->
+    <!-- ========================================== -->
+    <div id="admin-dashboard" class="hidden container mx-auto px-4 py-8">
+        <header class="flex justify-between items-center mb-8 bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
+            <div>
+                <h1 class="text-2xl font-bold text-emerald-400">Panel de Administración - SaaS</h1>
+                <p class="text-sm text-gray-400 mt-1">Bienvenido, <span id="admin-user-display" class="font-semibold text-white"></span></p>
+            </div>
+            <div class="space-x-2">
+                <button onclick="logout()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <!-- Tarjetas de Estadísticas de Negocio -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Ganancias Totales (MRR)</p>
+                    <h3 id="admin-stat-ganancias" class="text-2xl font-bold text-emerald-400 mt-1">$0.00</h3>
+                </div>
+                <div class="p-3 bg-emerald-600/20 text-emerald-400 rounded-lg">💰</div>
+            </div>
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Total Clientes</p>
+                    <h3 id="admin-stat-clientes" class="text-2xl font-bold text-indigo-400 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-indigo-600/20 text-indigo-400 rounded-lg">👥</div>
+            </div>
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Productos Monitoreados</p>
+                    <h3 id="admin-stat-productos" class="text-2xl font-bold text-blue-400 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-blue-600/20 text-blue-400 rounded-lg">📊</div>
+            </div>
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Alertas Activas</p>
+                    <h3 id="admin-stat-alertas" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-amber-600/20 text-amber-400 rounded-lg">⚡</div>
+            </div>
         </div>
 
-        <!-- Tarjetas de Estadísticas Admin -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-gray-900 border border-gray-800 p-6 rounded-xl">
-                <p class="text-sm text-gray-400">Ganancias Totales</p>
-                <p id="admin-stat-ganancias" class="text-3xl font-bold text-emerald-400 mt-2">$0.00</p>
-            </div>
-            <div class="bg-gray-900 border border-gray-800 p-6 rounded-xl">
-                <p class="text-sm text-gray-400">Total Clientes</p>
-                <p id="admin-stat-clientes" class="text-3xl font-bold text-indigo-400 mt-2">0</p>
-            </div>
-            <div class="bg-gray-900 border border-gray-800 p-6 rounded-xl">
-                <p class="text-sm text-gray-400">Productos Registrados</p>
-                <p id="admin-stat-productos" class="text-3xl font-bold text-amber-400 mt-2">0</p>
-            </div>
-            <div class="bg-gray-900 border border-gray-800 p-6 rounded-xl">
-                <p class="text-sm text-gray-400">Alertas Activas</p>
-                <p id="admin-stat-alertas" class="text-3xl font-bold text-rose-400 mt-2">0</p>
-            </div>
-        </div>
-
-        <!-- Gráficos Admin -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div class="bg-gray-900 border border-gray-800 p-6 rounded-xl h-80">
-                <h3 class="text-lg font-semibold mb-4 text-gray-200">Crecimiento de Ganancias</h3>
-                <div class="relative h-60">
+        <!-- Gráficos de Estadísticas -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow">
+                <h2 class="text-lg font-semibold text-emerald-300 mb-4">Crecimiento de Ganancias ($)</h2>
+                <div class="relative h-64">
                     <canvas id="adminRevenueChart"></canvas>
                 </div>
             </div>
-            <div class="bg-gray-900 border border-gray-800 p-6 rounded-xl h-80">
-                <h3 class="text-lg font-semibold mb-4 text-gray-200">Productos por Categoría</h3>
-                <div class="relative h-60">
+            <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow">
+                <h2 class="text-lg font-semibold text-indigo-300 mb-4">Productos por Categoría</h2>
+                <div class="relative h-64">
                     <canvas id="adminCategoryChart"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Gestión de Clientes y Planes -->
-        <div class="bg-gray-900 border border-gray-800 p-6 rounded-xl">
-            <h3 class="text-xl font-semibold mb-4 text-white">Gestión de Clientes y Planes Pagados</h3>
+        <!-- Lista de Clientes Registrados -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow mb-8">
+            <div class="p-4 border-b border-gray-700 bg-gray-800/50 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-emerald-300">Lista de Clientes Registrados</h2>
+                <button onclick="cargarAdminData()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs">Actualizar Lista</button>
+            </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="border-b border-gray-800 text-gray-400 text-sm">
+                        <tr class="bg-gray-700/50 text-gray-300 text-sm">
                             <th class="p-3">ID</th>
-                            <th class="p-3">Usuario</th>
-                            <th class="p-3">Email</th>
-                            <th class="p-3">Plan / Rol</th>
-                            <th class="p-3">Productos</th>
-                            <th class="p-3">Acciones de Plan / Admin</th>
+                            <th class="p-3">Nombre de Usuario</th>
+                            <th class="p-3">Correo Electrónico</th>
+                            <th class="p-3">Rol</th>
+                            <th class="p-3">Productos Registrados</th>
+                            <th class="p-3">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="admin-clientes-tabla">
-                        <!-- Se llena dinámicamente -->
-                    </tbody>
+                    <tbody id="admin-clientes-tabla" class="divide-y divide-gray-700 text-sm"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Script de Lógica -->
+    <!-- Scripts de la Aplicación -->
     <script>
+        let isRegisterMode = false;
         let currentUser = null;
         let currentRole = null;
+        let adminRevChart = null;
+        let adminCatChart = null;
+        let productosCache = [];
         let currentChartProduct = null;
         let currentChartObjective = 0;
 
-        let revenueChartInstance = null;
-        let categoryChartInstance = null;
-        let historial = [];
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600 text-white' : type === 'error' ? 'bg-red-600 text-white' : 'bg-indigo-600 text-white';
+            toast.className = `${bgClass} px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition transform translate-y-2 opacity-0 duration-300`;
+            toast.innerText = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
-        // Simulación de Login para demostración del flujo
-        function login() {
-            const user = document.getElementById('username').value.trim();
-            if (!user) {
-                alert('Por favor ingrese un usuario');
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+            document.getElementById('auth-subtitle').innerText = isRegisterMode ? "Crea una nueva cuenta de cliente" : "Inicia sesión en tu cuenta";
+            document.getElementById('email-field').classList.toggle('hidden', !isRegisterMode);
+            document.getElementById('auth-btn').querySelector('span').innerText = isRegisterMode ? "Crear Cuenta" : "Iniciar Sesión";
+            document.getElementById('toggle-mode-btn').innerText = isRegisterMode ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Regístrate aquí";
+            document.getElementById('error-msg').classList.add('hidden');
+        }
+
+        async function handleAuth(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const email = document.getElementById('email').value;
+            const errorDiv = document.getElementById('error-msg');
+            errorDiv.classList.add('hidden');
+
+            const endpoint = isRegisterMode ? '/api/register' : '/api/login';
+            const payload = isRegisterMode ? { username, email, password } : { username, password };
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Error en la autenticación');
+
+                if (isRegisterMode) {
+                    showToast('Registro exitoso. Inicia sesión.', 'success');
+                    toggleAuthMode();
+                } else {
+                    currentUser = data.username;
+                    currentRole = data.rol;
+                    document.getElementById('auth-container').classList.add('hidden');
+
+                    if (currentRole === 'admin') {
+                        document.getElementById('admin-user-display').innerText = currentUser;
+                        document.getElementById('admin-dashboard').classList.remove('hidden');
+                        cargarAdminData();
+                    } else {
+                        document.getElementById('client-user-display').innerText = currentUser;
+                        document.getElementById('client-dashboard').classList.remove('hidden');
+                        cargarProductosCliente();
+                    }
+                }
+            } catch (err) {
+                errorDiv.innerText = err.message;
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        async function cargarProductosCliente() {
+            try {
+                const res = await fetch(`/api/productos?username=${encodeURIComponent(currentUser)}&rol=${encodeURIComponent(currentRole)}`);
+                productosCache = await res.json();
+                renderizarTablaProductos(productosCache);
+            } catch (err) {
+                console.error("Error al cargar productos:", err);
+            }
+        }
+
+        function renderizarTablaProductos(productos) {
+            const tbody = document.getElementById('productos-tabla');
+            tbody.innerHTML = '';
+
+            let total = productos.length;
+            let activos = productos.filter(p => p.estado === 'activo').length;
+            let alertas = productos.filter(p => p.precio > 0 && p.precio_objetivo > 0 && p.precio <= p.precio_objetivo).length;
+
+            document.getElementById('client-stat-total').innerText = total;
+            document.getElementById('client-stat-activos').innerText = activos;
+            document.getElementById('client-stat-alertas').innerText = alertas;
+
+            if (total === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">No hay productos registrados.</td></tr>`;
                 return;
             }
-            currentUser = user;
-            // Si el usuario es admin, cargamos el panel de administrador, sino el de cliente
-            if (user.toLowerCase() === 'admin') {
-                currentRole = 'admin';
-                document.getElementById('auth-container').classList.add('hidden');
-                document.getElementById('admin-dashboard').classList.remove('hidden');
-                cargarAdminData();
-            } else {
-                currentRole = 'cliente';
-                document.getElementById('auth-container').classList.add('hidden');
-                document.getElementById('client-dashboard').classList.remove('hidden');
-                // Ejemplo de historial inicial para probar
-                historial = [
-                    { fecha: '2026-07-25', precio: 120.50 },
-                    { fecha: '2026-07-28', precio: 115.00 },
-                    { fecha: '2026-07-30', precio: 110.00 }
-                ];
-                verHistorial('Producto Ejemplo', 100.00);
-            }
+
+            productos.forEach(p => {
+                const alerta = p.precio > 0 && p.precio_objetivo > 0 && p.precio <= p.precio_objetivo;
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-700/30 transition";
+                tr.innerHTML = `
+                    <td class="p-3 font-medium text-white">${p.producto}</td>
+                    <td class="p-3"><span class="bg-gray-700 px-2 py-1 rounded text-xs">${p.categoria}</span></td>
+                    <td class="p-3 font-bold ${alerta ? 'text-emerald-400' : 'text-indigo-300'}">$${p.precio.toFixed(2)} ${alerta ? '🔥 ¡Alerta!' : ''}</td>
+                    <td class="p-3 text-gray-300">$${p.precio_objetivo.toFixed(2)}</td>
+                    <td class="p-3 text-gray-400 text-xs">${p.fecha}</td>
+                    <td class="p-3"><span class="px-2 py-1 rounded text-xs ${p.estado === 'activo' ? 'bg-emerald-900 text-emerald-300' : 'bg-amber-900 text-amber-300'}">${p.estado}</span></td>
+                    <td class="p-3 space-x-2">
+                        <button onclick="verHistorial('${p.producto}', ${p.precio_objetivo})" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded text-xs text-white">Historial</button>
+                        <button onclick="cambiarEstado(${p.id}, '${p.estado}')" class="bg-amber-600 hover:bg-amber-500 px-2.5 py-1 rounded text-xs text-white">${p.estado === 'activo' ? 'Pausar' : 'Activar'}</button>
+                        <button onclick="eliminarProducto(${p.id})" class="bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded text-xs text-white">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
-        function logout() {
-            currentUser = null;
-            currentRole = null;
-            currentChartProduct = null;
-            document.getElementById('client-dashboard').classList.add('hidden');
-            document.getElementById('admin-dashboard').classList.add('hidden');
-            document.getElementById('auth-container').classList.remove('hidden');
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
+        function filtrarProductos() {
+            const query = document.getElementById('busqueda-producto').value.toLowerCase();
+            const filtrados = productosCache.filter(p => 
+                p.producto.toLowerCase().includes(query) || p.categoria.toLowerCase().includes(query)
+            );
+            renderizarTablaProductos(filtrados);
         }
 
-        // Selección de plan por parte del cliente (coincidente con el main / backend)
-        async function seleccionarPlan(nuevoPlan) {
+        async function agregarProducto(event) {
+            event.preventDefault();
+            const nombre = document.getElementById('prod-nombre').value;
+            const url = document.getElementById('prod-url').value;
+            const categoria = document.getElementById('prod-categoria').value;
+            const precio_objetivo = parseFloat(document.getElementById('prod-objetivo').value);
+
             try {
-                const response = await fetch(`/api/usuario/plan`, {
-                    method: 'PATCH',
+                const res = await fetch('/api/agregar-producto', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: currentUser, rol: nuevoPlan })
+                    body: JSON.stringify({ username: currentUser, nombre, url, categoria, precio_objetivo })
                 });
 
-                // Si no hay backend configurado para pruebas puras en frontend, simulamos el cambio localmente
-                currentRole = nuevoPlan;
-                document.getElementById('current-plan-badge').innerText = nuevoPlan.toUpperCase();
-                document.getElementById('current-plan-badge').className = `px-2 py-1 rounded text-xs font-bold ${nuevoPlan === 'pro' ? 'bg-indigo-900 text-indigo-200' : 'bg-gray-700 text-gray-200'}`;
-                alert(`¡Plan actualizado exitosamente a: ${nuevoPlan.toUpperCase()}!`);
-            } catch (error) {
-                // Modo simulación si falla la red
-                currentRole = nuevoPlan;
-                document.getElementById('current-plan-badge').innerText = nuevoPlan.toUpperCase();
-                alert(`Plan cambiado a: ${nuevoPlan.toUpperCase()}`);
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    if (errorData.detail === "LÍMITE_GRATIS_ALCANZADO" || errorData.detail === "LÍMITE_ESTANDAR_ALCANZADO") {
+                        abrirModalPro('pro');
+                        return;
+                    }
+                    throw new Error(errorData.detail || 'Error al registrar producto');
+                }
+
+                document.getElementById('prod-nombre').value = '';
+                document.getElementById('prod-url').value = '';
+                document.getElementById('prod-categoria').value = '';
+                document.getElementById('prod-objetivo').value = '';
+                showToast('Producto registrado exitosamente', 'success');
+                cargarProductosCliente();
+            } catch (err) {
+                showToast(err.message, 'error');
             }
         }
 
-        async function actualizarHistorialActual() {
-            try {
-                const tbody = document.getElementById('historial-tabla');
-                tbody.innerHTML = '';
-
-                if (historial.length === 0) {
-                    document.getElementById('stat-min').innerText = '$0.00';
-                    document.getElementById('stat-max').innerText = '$0.00';
-                    document.getElementById('stat-diff').innerText = 'N/A';
-                    tbody.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-gray-400">No hay registros de historial disponibles.</td></tr>`;
-                    return;
-                }
-
-                const precios = historial.map(h => h.precio);
-                const precioMin = Math.min(...precios);
-                const precioMax = Math.max(...precios);
-                const ultimoPrecio = precios[precios.length - 1];
-
-                const diferencia = ultimoPrecio - currentChartObjective;
-                let diffText = "";
-                if (diferencia > 0) {
-                    diffText = `Estás a $${diferencia.toFixed(2)} de tu meta`;
-                } else if (diferencia === 0) {
-                    diffText = `¡En tu precio objetivo exacto!`;
-                } else {
-                    diffText = `¡Meta superada por $${Math.abs(diferencia).toFixed(2)}!`;
-                }
-
-                document.getElementById('stat-min').innerText = `$${precioMin.toFixed(2)}`;
-                document.getElementById('stat-max').innerText = `$${precioMax.toFixed(2)}`;
-                document.getElementById('stat-diff').innerText = diffText;
-
-                historial.forEach(h => {
-                    const tr = document.createElement('tr');
-                    tr.className = "hover:bg-gray-800/50 transition";
-                    tr.innerHTML = `
-                        <td class="p-3 text-gray-300">${h.fecha}</td>
-                        <td class="p-3 font-semibold text-white">$${h.precio.toFixed(2)}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (err) {
-                console.error("Error al actualizar el historial:", err);
+        function abrirModalPro(tipo) {
+            const modal = document.getElementById('modal-pro');
+            const titulo = document.getElementById('modal-title');
+            const desc = document.getElementById('modal-desc');
+            
+            if (tipo === 'estandar') {
+                titulo.innerText = '¡Actualiza a Plan Estándar!';
+                desc.innerHTML = `Desbloquea hasta <span class="text-indigo-400 font-semibold">15 productos</span> por solo <span class="text-emerald-400 font-bold">S/ 14.90 / mes</span>[cite: 3].`;
+            } else {
+                titulo.innerText = '¡Límite del Plan Alcanzado!';
+                desc.innerHTML = `Desbloquea <span class="text-indigo-400 font-semibold">Monitoreo Ilimitado</span> por solo <span class="text-emerald-400 font-bold">S/ 29.90 / mes</span>[cite: 2].`;
             }
+            modal.classList.remove('hidden');
+        }
+
+        function cerrarModalPro() {
+            document.getElementById('modal-pro').classList.add('hidden');
+        }
+
+        async function cambiarEstado(id, estadoActual) {
+            const nuevoEstado = estadoActual === 'activo' ? 'pausado' : 'activo';
+            await fetch(`/api/productos/${id}/estado`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: nuevoEstado })
+            });
+            showToast('Estado actualizado', 'info');
+            cargarProductosCliente();
+        }
+
+        async function eliminarProducto(id) {
+            if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+            await fetch(`/api/productos/${id}`, { method: 'DELETE' });
+            showToast('Producto eliminado', 'success');
+            cargarProductosCliente();
         }
 
         async function verHistorial(nombreProducto, precioObjetivo = 0) {
@@ -292,114 +558,40 @@
             window.location.href = `/api/exportar-csv?username=${encodeURIComponent(currentUser)}&rol=${encodeURIComponent(currentRole)}`;
         }
 
-        // --- Funciones de Administrador (Actualizadas para gestionar planes pagados) ---
         async function cargarAdminData() {
             try {
-                // Simulación de datos o llamada real al endpoint del backend
-                const data = {
-                    ganancias_totales: 1240.00,
-                    total_clientes: 5,
-                    total_productos: 7,
-                    total_alertas: 2,
-                    clientes: [
-                        { id: 1, username: 'carlos_data', email: 'carlos@example.com', rol: 'pro', productos_registrados: 3 },
-                        { id: 2, username: 'fatima_user', email: 'fatima@example.com', rol: 'cliente', productos_registrados: 2 },
-                        { id: 3, username: 'usuario_test', email: 'test@example.com', rol: 'pro', productos_registrados: 2 }
-                    ]
-                };
+                const response = await fetch('/api/admin/data');
+                if (!response.ok) throw new Error("Error al cargar los datos del panel");
+                const data = await response.json();
 
-                // Actualizar tarjetas superiores
                 document.getElementById('admin-stat-ganancias').innerText = `$${Number(data.ganancias_totales || 0).toFixed(2)}`;
                 document.getElementById('admin-stat-clientes').innerText = data.total_clientes || 0;
                 document.getElementById('admin-stat-productos').innerText = data.total_productos || 0;
                 document.getElementById('admin-stat-alertas').innerText = data.total_alertas || 0;
 
-                // Renderizar tabla de clientes con asignación de planes/roles basados en pago
                 const tbody = document.getElementById('admin-clientes-tabla');
                 if (tbody) {
                     let filasHtml = '';
-                    const listaClientes = data.clientes || [];
-                    
-                    listaClientes.forEach(cliente => {
-                        let botonPlan = cliente.rol === 'pro' 
-                            ? `<button onclick="cambiarRolUsuario(${cliente.id}, 'cliente')" class="bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs font-semibold mr-2 transition">Cambiar a Estándar</button>`
-                            : `<button onclick="cambiarRolUsuario(${cliente.id}, 'pro')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs font-semibold mr-2 transition">Asignar Plan Pro</button>`;
+                    (data.clientes || []).forEach(cliente => {
+                        let botonRol = cliente.rol === 'pro' 
+                            ? `<button onclick="cambiarRolUsuario(${cliente.id}, 'cliente')" class="bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs font-semibold mr-2 transition">Quitar Pro</button>`
+                            : `<button onclick="cambiarRolUsuario(${cliente.id}, 'pro')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs font-semibold mr-2 transition">Hacer Pro</button>`;
 
                         filasHtml += `
-                            <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                            <tr>
                                 <td class="p-3">#${cliente.id}</td>
                                 <td class="p-3">${cliente.username}</td>
-                                <td class="p-3 text-gray-400">${cliente.email}</td>
-                                <td class="p-3">
-                                    <span class="px-2 py-1 rounded text-xs ${cliente.rol === 'pro' ? 'bg-indigo-900 text-indigo-200 font-bold' : 'bg-gray-700 text-gray-300'}">${cliente.rol.toUpperCase()}</span>
-                                </td>
-                                <td class="p-3">${cliente.productos_registrados} productos</td>
-                                <td class="p-3">
-                                    ${botonPlan}
-                                    <button onclick="eliminarCliente(${cliente.id})" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded text-xs font-semibold transition">Eliminar</button>
-                                </td>
+                                <td class="p-3">${cliente.email}</td>
+                                <td class="p-3"><span class="px-2 py-1 rounded text-xs ${cliente.rol === 'pro' ? 'bg-indigo-900 text-indigo-200 font-bold' : 'bg-gray-700 text-gray-300'}">${cliente.rol}</span></td>
+                                <td class="p-3">${cliente.productos_registrados || 0} productos</td>
+                                <td class="p-3">${botonRol}<button onclick="eliminarCliente(${cliente.id})" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded text-xs font-semibold transition">Eliminar</button></td>
                             </tr>
                         `;
                     });
                     tbody.innerHTML = filasHtml;
                 }
-
-                renderizarGraficos(data);
             } catch (error) {
-                console.error("Error al cargar datos de admin:", error);
-            }
-        }
-
-        function renderizarGraficos(data) {
-            const ctxRevenue = document.getElementById('adminRevenueChart');
-            if (ctxRevenue) {
-                if (revenueChartInstance) revenueChartInstance.destroy();
-
-                revenueChartInstance = new Chart(ctxRevenue, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul'],
-                        datasets: [{
-                            label: 'Ganancias ($)',
-                            data: [150, 230, 410, 580, 790, 950, data.ganancias_totales || 1240],
-                            backgroundColor: '#34d399',
-                            borderRadius: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
-                            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } }
-                        }
-                    }
-                });
-            }
-
-            const ctxCategory = document.getElementById('adminCategoryChart');
-            if (ctxCategory) {
-                if (categoryChartInstance) categoryChartInstance.destroy();
-
-                categoryChartInstance = new Chart(ctxCategory, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Tecnología', 'Hogar', 'Moda', 'Otros'],
-                        datasets: [{
-                            data: [12, 8, 5, 3],
-                            backgroundColor: ['#818cf8', '#34d399', '#ffb703', '#ef476f'],
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { position: 'top', labels: { color: '#9ca3af', boxWidth: 12 } }
-                        }
-                    }
-                });
+                console.error("Error:", error);
             }
         }
 
@@ -410,27 +602,30 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ rol: nuevoRol })
                 });
-
-                if (!response.ok) throw new Error("No se pudo actualizar el plan/rol del usuario");
-
-                alert(`Plan actualizado correctamente a ${nuevoRol.toUpperCase()}`);
+                if (!response.ok) throw new Error("No se pudo actualizar el rol del usuario");
                 cargarAdminData();
             } catch (error) {
-                // Simulación local si el endpoint no está activo en entorno estático
-                alert(`Plan del usuario #${usuarioId} actualizado a ${nuevoRol.toUpperCase()} exitosamente.`);
-                cargarAdminData();
+                alert(error.message);
             }
         }
 
         async function eliminarCliente(id) {
             if (!confirm('¿Estás seguro de eliminar este cliente y sus productos?')) return;
-            try {
-                await fetch(`/api/admin/clientes/${id}`, { method: 'DELETE' });
-            } catch (e) {
-                console.log("Simulación de eliminación local.");
-            }
-            alert('Cliente eliminado correctamente');
+            await fetch(`/api/admin/clientes/${id}`, { method: 'DELETE' });
+            showToast('Cliente eliminado correctamente', 'success');
             cargarAdminData();
+        }
+
+        function logout() {
+            currentUser = null;
+            currentRole = null;
+            currentChartProduct = null;
+            document.getElementById('client-dashboard').classList.add('hidden');
+            document.getElementById('admin-dashboard').classList.add('hidden');
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            showToast('Sesión cerrada', 'info');
         }
     </script>
 </body>
