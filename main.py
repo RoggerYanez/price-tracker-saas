@@ -313,7 +313,7 @@ def agregar_producto(item: NuevoProducto):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     
-    # 1. Verificar el rol y restricciones Freemium (Solo restringe si el rol es estrictamente 'cliente')
+    # 1. Verificar el rol y restricciones de planes (cliente: 2, estandar: 15, pro/admin: ilimitado)
     cursor.execute("SELECT rol FROM usuarios WHERE username = %s", (item.username,))
     res_usuario = cursor.fetchone()
     
@@ -335,8 +335,19 @@ def agregar_producto(item: NuevoProducto):
                 status_code=403, 
                 detail="LÍMITE_GRATIS_ALCANZADO"
             )
+    elif rol_usuario == 'estandar':
+        cursor.execute("SELECT COUNT(*) FROM productos_configurados WHERE username = %s", (item.username,))
+        total_prods = cursor.fetchone()[0]
+        
+        if total_prods >= 15:
+            cursor.close()
+            conexion.close()
+            raise HTTPException(
+                status_code=403, 
+                detail="LÍMITE_ESTANDAR_ALCANZADO"
+            )
 
-    # 2. Insertar el producto si pasa la validación (admin y pro pasan sin restricciones)
+    # 2. Insertar el producto si pasa la validación
     cursor.execute(
         "INSERT INTO productos_configurados (username, nombre, url, categoria, precio_objetivo, estado) VALUES (%s, %s, %s, %s, %s, 'activo')",
         (item.username, item.nombre, item.url, item.categoria, item.precio_objetivo)
@@ -386,11 +397,18 @@ def eliminar_producto(producto_id: int):
     return {"mensaje": "Producto eliminado exitosamente"}
 
 @app.get("/api/historial/{nombre_producto}")
-def obtener_historial_producto(nombre_producto: str):
+def obtener_historial_producto(nombre_producto: str, rol: str = Query('cliente')):
     conexion = obtener_conexion()
     cursor = conexion.cursor()
+    
+    # Validar permisos: solo 'estandar' y 'pro' (o admin) pueden ver el historial detallado de 5 registros
+    if rol == 'cliente':
+        cursor.close()
+        conexion.close()
+        raise HTTPException(status_code=403, detail="El plan gratuito no incluye historial de precios detallado.")
+
     cursor.execute(
-        "SELECT precio, fecha FROM historial_precios WHERE producto = %s ORDER BY id ASC",
+        "SELECT precio, fecha FROM historial_precios WHERE producto = %s ORDER BY id DESC LIMIT 5",
         (nombre_producto,)
     )
     filas = cursor.fetchall()
@@ -412,7 +430,7 @@ def logica_admin_data():
     clientes = []
     total_productos = 0
     total_alertas = 0
-    total_pro = 0
+    ganancias_totales = 0.0
     
     for u in usuarios_db:
         cursor.execute("""
@@ -430,19 +448,21 @@ def logica_admin_data():
         total_productos += prod_count
         total_alertas += alertas_count
         
-        if u[3] == 'pro':
-            total_pro += 1
+        # Calcular ingresos acumulados según el rol del usuario (estandar = S/ 14.90, pro = S/ 29.90)
+        rol_usuario = u[3]
+        if rol_usuario == 'estandar':
+            ganancias_totales += 14.90
+        elif rol_usuario == 'pro':
+            ganancias_totales += 29.90
         
         clientes.append({
             "id": u[0],
             "username": u[1],
             "email": u[2],
-            "rol": u[3],
+            "rol": rol_usuario,
             "productos_count": prod_count,
             "productos_registrados": prod_count
         })
-    
-    ganancias_totales = total_pro * 29.90
     
     cursor.close()
     conexion.close()
@@ -501,6 +521,10 @@ def eliminar_cliente(cliente_id: int):
 
 @app.get("/api/exportar-csv")
 def exportar_csv(username: str = Query(...), rol: str = Query(...)):
+    # Restricción: Solo los usuarios con rol 'pro' (o admin) pueden exportar a CSV
+    if rol != 'pro' and rol != 'admin':
+        raise HTTPException(status_code=403, detail="La exportación a CSV es un beneficio exclusivo del plan Pro.")
+
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     
